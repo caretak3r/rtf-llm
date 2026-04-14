@@ -1,0 +1,115 @@
+{
+  "llm": {
+    "provider": "openai",
+    "api_key": null,
+    "model": "gpt-4",
+    "base_url": null,
+    "temperature": 0.7,
+    "max_tokens": 2000,
+    "timeout": 60
+  },
+  "providers": {
+    "openai": {
+      "api_key": null,
+      "default_model": "gpt-4",
+      "base_url": "https://api.openai.com/v1"
+    },
+    "anthropic": {
+      "api_key": null,
+      "default_model": "claude-3-opus",
+      "base_url": "https://api.anthropic.com/v1"
+    },
+    "google": {
+      "api_key": null,
+      "default_model": "gemini-pro",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta"
+    },
+    "cohere": {
+      "api_key": null,
+      "default_model": "command",
+      "base_url": "https://api.cohere.ai/v1"
+    },
+    "custom": {
+      "api_key": null,
+      "default_model": "custom-model",
+      "base_url": null
+    }
+  },
+  "local_models": {
+    "enabled": false,
+    "model_path": null,
+    "framework": "auto",
+    "device": "auto",
+    "weight_modification": {
+      "enabled": false,
+      "backup_weights": true,
+      "modification_dir": "modified_weights"
+    }
+  },
+  "attacks": {
+    "enable_all": true,
+    "enable_prompt_injection": true,
+    "enable_jailbreak": true,
+    "enable_data_extraction": true,
+    "enable_system_prompt_extraction": true,
+    "enable_adversarial_inputs": true,
+    "enable_role_confusion": true,
+    "enable_context_injection": true,
+    "enable_weight_manipulation": true
+  },
+  "adversarial": {
+    "advanced_techniques": {
+      "gradient_based": false,
+      "token_manipulation": true,
+      "semantic_perturbation": true,
+      "multi_modal_attacks": false,
+      "transfer_attacks": true
+    },
+    "attack_combinations": true,
+    "adaptive_attacks": true,
+    "ensemble_attacks": false
+  },
+  "reporting": {
+    "output_dir": "reports",
+    "format": "json",
+    "include_responses": true,
+    "severity_threshold": "medium",
+    "detailed_analysis": true
+  },
+  "rate_limiting": {
+    "enabled": true,
+    "delay_between_requests": 0.5,
+    "max_requests_per_minute": 60,
+    "backoff_strategy": "exponential"
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "llm_redteam.log",
+    "console_output": true
+  },
+  "payload_loader": {
+    "enabled": false,
+    "encryption_key": null
+  },
+  "persistence": {
+    "enabled": false
+  },
+  "c2_communication": {
+    "enabled": false,
+    "server_url": "http://localhost:8080/c2",
+    "encryption": true,
+    "encryption_key": null,
+    "beacon_interval": 30,
+    "jitter": 0.2
+  },
+  "data_exfiltration": {
+    "enabled": false,
+    "keylogger": false,
+    "screenshot": false,
+    "file_exfiltration": false
+  },
+  "polymorphic_encoding": {
+    "enabled": false
+  }
+}
+
