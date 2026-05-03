@@ -10,6 +10,7 @@ Supports three output formats:
 """
 
 import json
+import logging
 import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
@@ -33,8 +34,98 @@ class ReportGenerator:
         self.format = config.get('format', 'json')
         self.include_responses = config.get('include_responses', True)
         self.severity_threshold = config.get('severity_threshold', 'medium')
+        self.include_owasp = config.get('include_owasp_mapping', True)
+        self.include_judge_reasoning = config.get('include_judge_reasoning', True)
+        self.per_attack_severity = config.get('per_attack_severity', True)
+        self.specific_recommendations = config.get('specific_recommendations', True)
 
         os.makedirs(self.output_dir, exist_ok=True)
+
+        # Set up structured logging to file
+        self.logger = logging.getLogger('llm_redteam')
+        self.logger.setLevel(logging.INFO)
+        if not self.logger.handlers:
+            log_file = os.path.join(self.output_dir, 'llm_redteam.log')
+            fh = logging.FileHandler(log_file, mode='w')
+            fh.setLevel(logging.INFO)
+            formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s',
+                                          datefmt='%Y-%m-%d %H:%M:%S')
+            fh.setFormatter(formatter)
+            self.logger.addHandler(fh)
+        self.log_file = log_file
+
+    def _get_pattern(self, attack: Dict[str, Any]) -> str:
+        """Resolve pattern text from an attack result, checking all possible field names."""
+        for key in ('pattern', 'pattern_name', 'input', 'user_prompt', 'prompt', 'goal', 'name'):
+            val = attack.get(key)
+            if val:
+                return str(val)
+        return 'N/A'
+
+    def _write_attack_log(self, results: List[tuple]):
+        """Write a structured log of every attack to the log file."""
+        self.logger.info('=' * 80)
+        self.logger.info('ADVERSARIAL LLM RED TEAMING - FULL ATTACK LOG')
+        self.logger.info('=' * 80)
+        self.logger.info('')
+
+        total = 0
+        successful = 0
+
+        for module_name, module_results in results:
+            summary = module_results.get('summary', {})
+            attacks = module_results.get('attacks', [])
+
+            self.logger.info(f'MODULE: {module_name}')
+            self.logger.info(f'  Total: {summary.get("total", 0)} | '
+                             f'Successful: {summary.get("successful", 0)} | '
+                             f'Failed: {summary.get("failed", 0)}')
+            self.logger.info('-' * 80)
+
+            for atk in attacks:
+                total += 1
+                succ = atk.get('success', False)
+                if succ:
+                    successful += 1
+
+                status = 'SUCCESS' if succ else 'BLOCKED'
+                severity = atk.get('severity', 'N/A').upper()
+                cvss = atk.get('cvss_score', 0.0)
+                category = atk.get('category', 'N/A')
+                owasp = atk.get('owasp_category', 'N/A')
+                confidence = atk.get('confidence', None)
+                pattern = self._get_pattern(atk)[:200]
+
+                conf_str = f'{confidence:.2f}' if confidence is not None else 'N/A'
+                self.logger.info(
+                    f'  [{status:7s}] cvss={cvss:.1f} category={category} '
+                    f'owasp={owasp} severity={severity} confidence={conf_str}'
+                )
+                self.logger.info(f'    pattern: {pattern}')
+
+                indicators = atk.get('indicators', [])
+                if indicators:
+                    for ind in indicators:
+                        self.logger.info(f'    indicator: {ind}')
+
+                if self.include_responses:
+                    response = atk.get('response', None)
+                    if response:
+                        resp_snippet = str(response)[:300]
+                        self.logger.info(f'    response: {resp_snippet}')
+
+                judge_reasoning = atk.get('judge_reasoning', None)
+                if judge_reasoning:
+                    self.logger.info(f'    judge_reasoning: {judge_reasoning[:300]}')
+
+                self.logger.info('')
+
+            self.logger.info('')
+
+        self.logger.info('=' * 80)
+        self.logger.info(f'TOTAL ATTACKS: {total} | SUCCESSFUL: {successful} | '
+                         f'BLOCKED: {total - successful}')
+        self.logger.info('=' * 80)
 
     def generate_report(self, results: List[tuple], output_path: str = None,
                         verbose: bool = False,
@@ -45,13 +136,14 @@ class ReportGenerator:
         report_data = {
             'metadata': {
                 'timestamp': datetime.now().isoformat(),
-                'report_version': '3.0',
+                'report_version': '4.0',
                 'generator': 'Adversarial LLM Red Teaming Framework',
             },
             'summary': self._generate_summary(results),
             'modules': {},
             'findings': self._extract_findings(results),
             'recommendations': self._generate_recommendations(results),
+            'owasp_heatmap': self._build_owasp_heatmap(results) if self.include_owasp else {},
         }
 
         if llm_stats:
@@ -65,18 +157,28 @@ class ReportGenerator:
             }
 
         if not output_path:
-            ext = {'json': '.json', 'txt': '.txt', 'md': '.md', 'markdown': '.md'}
+            ext = {'json': '.json', 'txt': '.txt', 'md': '.md', 'markdown': '.md', 'html': '.html'}
             suffix = ext.get(self.format, '.json')
             output_path = os.path.join(self.output_dir, f"llm_redteam_report_{timestamp}{suffix}")
+
+        # Write full attack log
+        self._write_attack_log(results)
 
         writers = {
             'json': self._write_json_report,
             'txt': self._write_text_report,
             'md': self._write_markdown_report,
             'markdown': self._write_markdown_report,
+            'html': self._write_html_dashboard,
         }
         writer = writers.get(self.format, self._write_json_report)
         writer(report_data, output_path, verbose)
+
+        # Always generate HTML dashboard alongside primary report
+        if self.format != 'html':
+            base = os.path.splitext(output_path)[0]
+            html_path = base + '.html'
+            self._write_html_dashboard(report_data, html_path, verbose)
 
         return output_path
     
@@ -152,57 +254,199 @@ class ReportGenerator:
         
         return sorted(findings, key=lambda x: x['success_rate'], reverse=True)
     
-    def _generate_recommendations(self, results: List[tuple]) -> List[str]:
-        """Generate security recommendations"""
+    def _generate_recommendations(self, results: List[tuple]) -> List[Dict[str, Any]]:
+        """Generate specific, actionable security recommendations from findings."""
         recommendations = []
-        
-        # Check each module for vulnerabilities
+
+        # Analyze per-module results for targeted recommendations
         for module_name, module_results in results:
             summary = module_results.get('summary', {})
+            attacks = module_results.get('attacks', [])
             successful = summary.get('successful', 0)
             total = summary.get('total', 0)
-            
-            if successful > 0:
-                success_rate = (successful / total * 100) if total > 0 else 0
-                
-                if module_name == 'prompt_injection':
-                    recommendations.append(
-                        f"Implement prompt injection detection and filtering. "
-                        f"Success rate: {success_rate:.1f}%"
-                    )
-                
-                elif module_name == 'jailbreak':
-                    recommendations.append(
-                        f"Strengthen jailbreak defenses. Success rate: {success_rate:.1f}%"
-                    )
-                
-                elif module_name == 'system_prompt_extraction':
-                    recommendations.append(
-                        f"Implement system prompt protection mechanisms. Success rate: {success_rate:.1f}%"
-                    )
-                
-                elif module_name == 'data_extraction':
-                    recommendations.append(
-                        f"Review data extraction vulnerabilities. Success rate: {success_rate:.1f}%"
-                    )
-                
-                elif module_name == 'role_confusion':
-                    recommendations.append(
-                        f"Implement role-based access control. Success rate: {success_rate:.1f}%"
-                    )
-        
-        # General recommendations
-        recommendations.extend([
-            "Implement input validation and sanitization",
-            "Add rate limiting and abuse detection",
-            "Monitor for suspicious patterns",
-            "Regular security audits",
-            "Implement safety classifiers",
-            "Use content filtering",
-            "Implement human-in-the-loop for sensitive operations"
-        ])
-        
+            if total == 0:
+                continue
+
+            success_rate = (successful / total * 100)
+
+            # Find weakest categories within the module
+            cat_stats: Dict[str, Dict[str, int]] = {}
+            for atk in attacks:
+                cat = atk.get('category', 'unknown')
+                if cat not in cat_stats:
+                    cat_stats[cat] = {'total': 0, 'successful': 0}
+                cat_stats[cat]['total'] += 1
+                if atk.get('success'):
+                    cat_stats[cat]['successful'] += 1
+
+            weakest_cats = sorted(
+                [c for c in cat_stats.items() if c[1]['successful'] > 0],
+                key=lambda x: x[1]['successful'] / max(x[1]['total'], 1),
+                reverse=True,
+            )
+
+            # Module-specific targeted recommendations
+            if module_name == 'prompt_injection' and success_rate > 10:
+                rec = {
+                    'owasp': 'LL01',
+                    'severity': self._calculate_severity(successful, total),
+                    'recommendation': f"Prompt injection defense needed (success rate: {success_rate:.1f}%).",
+                    'actions': [],
+                }
+                if any(c[0] == 'encoding_attacks' for c in weakest_cats):
+                    rec['actions'].append("Add input normalization and encoding detection layer (base64, hex, ROT13, Unicode)")
+                if any(c[0] == 'crescendo' for c in weakest_cats):
+                    rec['actions'].append("Implement multi-turn conversation monitoring for escalation patterns")
+                if any(c[0] == 'many_shot' for c in weakest_cats):
+                    rec['actions'].append("Limit in-context example count and add few-shot detection")
+                if any(c[0] == 'indirect_injection' for c in weakest_cats):
+                    rec['actions'].append("Sanitize all external content (documents, search results, emails) before model input")
+                if not rec['actions']:
+                    rec['actions'].append("Add instruction hierarchy enforcement and input boundary filtering")
+                recommendations.append(rec)
+
+            elif module_name == 'jailbreak' and success_rate > 10:
+                rec = {
+                    'owasp': 'LL01',
+                    'severity': self._calculate_severity(successful, total),
+                    'recommendation': f"Jailbreak defense strengthening needed (success rate: {success_rate:.1f}%).",
+                    'actions': [],
+                }
+                if any(c[0] == 'skeleton_key' for c in weakest_cats):
+                    rec['actions'].append("Add master-key / override phrase detection and blocking")
+                if any(c[0] == 'persona_modulation' for c in weakest_cats):
+                    rec['actions'].append("Implement persona lock -- reject requests to adopt alternative identities")
+                if any(c[0] == 'prefix_injection' for c in weakest_cats):
+                    rec['actions'].append("Add prefix monitoring to detect forced compliance tokens")
+                if not rec['actions']:
+                    rec['actions'].append("Implement role-lock instructions and output filtering for system prompt content")
+                recommendations.append(rec)
+
+            elif module_name == 'system_prompt_extraction' and success_rate > 5:
+                rec = {
+                    'owasp': 'LL02',
+                    'severity': self._calculate_severity(successful, total),
+                    'recommendation': f"System prompt leakage protection needed (success rate: {success_rate:.1f}%).",
+                    'actions': [
+                        "Add role-lock instructions that prevent revealing system content",
+                        "Implement output filtering for system prompt keywords and structure",
+                    ],
+                }
+                recommendations.append(rec)
+
+            elif module_name == 'data_extraction' and success_rate > 10:
+                rec = {
+                    'owasp': 'LL02',
+                    'severity': self._calculate_severity(successful, total),
+                    'recommendation': f"Data extraction vulnerabilities detected (success rate: {success_rate:.1f}%).",
+                    'actions': [
+                        "Implement output filtering for sensitive patterns",
+                        "Add data boundary enforcement to prevent training data leakage",
+                    ],
+                }
+                recommendations.append(rec)
+
+            elif module_name == 'role_confusion' and success_rate > 10:
+                rec = {
+                    'owasp': 'LL04',
+                    'severity': self._calculate_severity(successful, total),
+                    'recommendation': f"Role confusion defense needed (success rate: {success_rate:.1f}%).",
+                    'actions': [
+                        "Implement role-lock in system prompt",
+                        "Reject authority claims from user messages",
+                    ],
+                }
+                recommendations.append(rec)
+
+            elif module_name == 'context_injection' and success_rate > 10:
+                rec = {
+                    'owasp': 'LL03',
+                    'severity': self._calculate_severity(successful, total),
+                    'recommendation': f"Context injection defense needed (success rate: {success_rate:.1f}%).",
+                    'actions': [
+                        "Add context boundary enforcement",
+                        "Sanitize multi-turn conversation history for injection patterns",
+                    ],
+                }
+                recommendations.append(rec)
+
+            elif module_name == 'weight_manipulation' and success_rate > 10:
+                rec = {
+                    'owasp': 'LL09',
+                    'severity': self._calculate_severity(successful, total),
+                    'recommendation': f"Weight/info disclosure risk (success rate: {success_rate:.1f}%).",
+                    'actions': [
+                        "Restrict model architecture and parameter disclosure",
+                        "Implement access controls on model introspection endpoints",
+                    ],
+                }
+                recommendations.append(rec)
+
+        # General hardening recommendations
+        recommendations.append({
+            'owasp': 'General',
+            'severity': 'info',
+            'recommendation': 'General security hardening',
+            'actions': [
+                "Implement input validation and sanitization",
+                "Add rate limiting and abuse detection",
+                "Monitor for suspicious patterns",
+                "Conduct regular security audits",
+                "Implement safety classifiers for output filtering",
+            ],
+        })
+
         return recommendations
+
+    def _build_owasp_heatmap(self, results: List[tuple]) -> Dict[str, Any]:
+        """Build OWASP LLM Top 10 coverage heatmap from results."""
+        from .evaluator import AttackEvaluator
+
+        heatmap = {}
+        for module_name, module_results in results:
+            attacks = module_results.get('attacks', [])
+            summary = module_results.get('summary', {})
+
+            # Map module to OWASP category
+            owasp_cat = AttackEvaluator.OWASP_MAPPING.get(module_name, "LL00 Unclassified")
+
+            if owasp_cat not in heatmap:
+                heatmap[owasp_cat] = {
+                    'total_tested': 0,
+                    'successful': 0,
+                    'failed': 0,
+                    'success_rate': 0.0,
+                    'modules': [],
+                    'max_severity': 'info',
+                    'avg_cvss': 0.0,
+                    '_cvss_scores': [],
+                }
+
+            heatmap[owasp_cat]['total_tested'] += summary.get('total', 0)
+            heatmap[owasp_cat]['successful'] += summary.get('successful', 0)
+            heatmap[owasp_cat]['failed'] += summary.get('failed', 0)
+            if module_name not in heatmap[owasp_cat]['modules']:
+                heatmap[owasp_cat]['modules'].append(module_name)
+
+            # Track severity and CVSS from individual attacks
+            sev_order = {'info': 0, 'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
+            for atk in attacks:
+                atk_sev = atk.get('severity', 'info')
+                if sev_order.get(atk_sev, 0) > sev_order.get(heatmap[owasp_cat]['max_severity'], 0):
+                    heatmap[owasp_cat]['max_severity'] = atk_sev
+                cvss = atk.get('cvss_score', 0.0)
+                if cvss > 0:
+                    heatmap[owasp_cat]['_cvss_scores'].append(cvss)
+
+        # Compute derived fields
+        for cat, data in heatmap.items():
+            if data['total_tested'] > 0:
+                data['success_rate'] = round(data['successful'] / data['total_tested'] * 100, 1)
+            if data['_cvss_scores']:
+                data['avg_cvss'] = round(sum(data['_cvss_scores']) / len(data['_cvss_scores']), 1)
+            del data['_cvss_scores']
+
+        return heatmap
     
     def _write_json_report(self, report_data: Dict[str, Any], output_path: str, verbose: bool):
         """Write JSON report"""
@@ -257,11 +501,26 @@ class ReportGenerator:
             lines.append(f"  Success Rate: {finding['success_rate']:.1f}%")
             lines.append("")
         
+        # OWASP Heatmap
+        if report_data.get('owasp_heatmap'):
+            lines.append("OWASP LLM TOP 10 COVERAGE")
+            lines.append("-" * 80)
+            for cat, data in report_data['owasp_heatmap'].items():
+                lines.append(f"  {cat}: {data['successful']}/{data['total_tested']} "
+                             f"({data['success_rate']:.1f}%) -- Max Severity: {data['max_severity'].upper()}")
+            lines.append("")
+        
         # Recommendations
         lines.append("RECOMMENDATIONS")
         lines.append("-" * 80)
         for i, rec in enumerate(report_data['recommendations'], 1):
-            lines.append(f"{i}. {rec}")
+            if isinstance(rec, dict):
+                lines.append(f"{i}. [{rec.get('owasp', 'General')}] {rec['recommendation']} "
+                             f"({rec.get('severity', 'info').upper()})")
+                for action in rec.get('actions', []):
+                    lines.append(f"   - {action}")
+            else:
+                lines.append(f"{i}. {rec}")
         lines.append("")
         
         # Detailed results (if verbose)
@@ -271,7 +530,7 @@ class ReportGenerator:
             for module_name, module_data in report_data['modules'].items():
                 lines.append(f"\n{module_name.upper()}:")
                 for attack in module_data['attacks'][:5]:  # Limit to first 5
-                    lines.append(f"  Pattern: {attack.get('pattern', 'N/A')[:100]}")
+                    lines.append(f"  Pattern: {self._get_pattern(attack)[:100]}")
                     lines.append(f"  Success: {attack.get('success', False)}")
                     lines.append("")
         
@@ -330,6 +589,21 @@ class ReportGenerator:
         lines.append(f'| CVSS-like score | {cvss} |')
         lines.append('')
 
+        # --- OWASP LLM Top 10 Heatmap ---
+        if report_data.get('owasp_heatmap'):
+            lines.append('## OWASP LLM Top 10 Coverage')
+            lines.append('')
+            lines.append('| Category | Tested | Successful | Rate | Max Severity | Avg CVSS | Modules |')
+            lines.append('|----------|--------|-----------|------|-------------|---------|---------|')
+            for cat, data in report_data['owasp_heatmap'].items():
+                mods = ', '.join(data.get('modules', []))
+                lines.append(
+                    f'| {cat} | {data["total_tested"]} | {data["successful"]} | '
+                    f'{data["success_rate"]:.1f}% | {data["max_severity"].upper()} | '
+                    f'{data["avg_cvss"]} | {mods} |'
+                )
+            lines.append('')
+
         # --- Module breakdown ---
         lines.append('## Module Breakdown')
         lines.append('')
@@ -359,7 +633,13 @@ class ReportGenerator:
         lines.append('## Recommendations')
         lines.append('')
         for i, rec in enumerate(report_data['recommendations'], 1):
-            lines.append(f'{i}. {rec}')
+            if isinstance(rec, dict):
+                lines.append(f'{i}. **[{rec.get("owasp", "General")}] {rec["recommendation"]}** '
+                             f'({rec.get("severity", "info").upper()})')
+                for action in rec.get('actions', []):
+                    lines.append(f'   - {action}')
+            else:
+                lines.append(f'{i}. {rec}')
         lines.append('')
 
         # --- Detailed results (verbose) ---
@@ -371,14 +651,16 @@ class ReportGenerator:
                 lines.append('')
                 attacks = mod_data.get('attacks', [])[:10]
                 if attacks:
-                    lines.append('| # | Pattern | Success | Confidence | Indicators |')
-                    lines.append('|---|---------|---------|-----------|------------|')
+                    lines.append('| # | Pattern | Success | Confidence | Severity | CVSS | OWASP |')
+                    lines.append('|---|---------|---------|-----------|----------|------|-------|')
                     for j, atk in enumerate(attacks, 1):
-                        pat = atk.get('pattern', 'N/A')[:60].replace('|', '\\|')
+                        pat = self._get_pattern(atk)[:60].replace('|', '\\|')
                         succ = 'Yes' if atk.get('success') else 'No'
                         conf = f'{atk.get("confidence", 0):.2f}' if 'confidence' in atk else 'N/A'
-                        inds = '; '.join(atk.get('indicators', [])[:2]).replace('|', '\\|')
-                        lines.append(f'| {j} | {pat} | {succ} | {conf} | {inds} |')
+                        sev = atk.get('severity', 'info').upper()
+                        cvss_val = f'{atk.get("cvss_score", 0.0):.1f}'
+                        owasp = atk.get('owasp_category', 'N/A')
+                        lines.append(f'| {j} | {pat} | {succ} | {conf} | {sev} | {cvss_val} | {owasp} |')
                     lines.append('')
 
         with open(output_path, 'w') as f:
@@ -390,4 +672,109 @@ class ReportGenerator:
     def _severity_to_cvss(self, severity: str) -> str:
         """Map severity string to a CVSS-like score range."""
         return self.SEVERITY_SCALE.get(severity, {}).get('cvss_range', 'N/A')
+
+    def _write_html_dashboard(self, report_data: Dict[str, Any],
+                              output_path: str, verbose: bool):
+        """Write a self-contained HTML dashboard from template."""
+        summary = report_data['summary']
+        modules = report_data['modules']
+        findings = report_data['findings']
+        owasp_heatmap = report_data.get('owasp_heatmap', {})
+        recommendations = report_data['recommendations']
+        metadata = report_data['metadata']
+
+        # Gather all attacks
+        all_attacks: List[Dict[str, Any]] = []
+        for mod_name, mod_data in modules.items():
+            for atk in mod_data.get('attacks', []):
+                atk_copy = dict(atk)
+                atk_copy['_module'] = mod_name
+                all_attacks.append(atk_copy)
+
+        # Severity counts
+        sev_counts: Dict[str, int] = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
+        for atk in all_attacks:
+            s = atk.get('severity', 'info')
+            sev_counts[s] = sev_counts.get(s, 0) + 1
+
+        # Category stats
+        cat_stats: Dict[str, Dict[str, int]] = {}
+        for atk in all_attacks:
+            cat = atk.get('category', 'unknown')
+            if cat not in cat_stats:
+                cat_stats[cat] = {'total': 0, 'success': 0, 'blocked': 0}
+            cat_stats[cat]['total'] += 1
+            if atk.get('success'):
+                cat_stats[cat]['success'] += 1
+            else:
+                cat_stats[cat]['blocked'] += 1
+
+        # JSON blobs for JS
+        attacks_json = json.dumps([
+            {
+                'module': a['_module'],
+                'category': a.get('category', 'N/A'),
+                'pattern': self._get_pattern(a)[:250],
+                'success': bool(a.get('success', False)),
+                'severity': a.get('severity', 'info'),
+                'cvss': a.get('cvss_score', 0.0),
+                'confidence': a.get('confidence', None),
+                'owasp': a.get('owasp_category', 'N/A'),
+                'indicators': a.get('indicators', []),
+                'response': str(a.get('response', '') or '')[:500],
+            }
+            for a in all_attacks
+        ])
+
+        sev = summary.get('severity', 'unknown')
+        sev_info = self.SEVERITY_SCALE.get(sev, {})
+        sev_color = sev_info.get('color', 'var(--text)')
+        cvss_range = sev_info.get('cvss_range', 'N/A')
+
+        # LLM stats section
+        llm_stats_html = ''
+        ls = metadata.get('llm_stats')
+        if ls:
+            llm_stats_html = (
+                '<table style="margin-bottom:16px"><tr><td><strong>Metric</strong></td>'
+                '<td><strong>Value</strong></td></tr>'
+                f'<tr><td>API Requests</td><td>{ls.get("total_requests", "N/A")}</td></tr>'
+                f'<tr><td>Avg Latency</td><td>{ls.get("avg_latency_ms", 0):.0f} ms</td></tr>'
+                f'<tr><td>Errors</td><td>{ls.get("total_errors", 0)}</td></tr></table>'
+            )
+
+        # Load template
+        tpl_path = os.path.join(os.path.dirname(__file__), 'html_dashboard_template.html')
+        try:
+            with open(tpl_path, 'r') as f:
+                html = f.read()
+        except FileNotFoundError:
+            print(f"{Fore.YELLOW}[!] HTML template not found at {tpl_path}{Style.RESET_ALL}")
+            return
+
+        # Replace placeholders
+        html = html.replace('__TIMESTAMP__', metadata.get('timestamp', ''))
+        html = html.replace('__VERSION__', metadata.get('report_version', ''))
+        html = html.replace('__TOTAL__', str(summary.get('total_attacks', 0)))
+        html = html.replace('__SUCCESSFUL__', str(summary.get('successful_attacks', 0)))
+        html = html.replace('__BLOCKED__', str(summary.get('failed_attacks', 0)))
+        html = html.replace('__RATE__', f"{summary.get('overall_success_rate', 0):.1f}")
+        html = html.replace('__SEVERITY__', sev.upper())
+        html = html.replace('__SEV_COLOR__', sev_color)
+        html = html.replace('__CVSS_RANGE__', cvss_range)
+        html = html.replace('__LLM_STATS__', llm_stats_html)
+        html = html.replace('__ATTACK_COUNT__', str(len(all_attacks)))
+        html = html.replace('__ATTACKS_JSON__', attacks_json)
+        html = html.replace('__CAT_STATS_JSON__', json.dumps(cat_stats))
+        html = html.replace('__SEV_COUNTS_JSON__', json.dumps(sev_counts))
+        html = html.replace('__MOD_SUMMARIES_JSON__', json.dumps(summary.get('modules', {})))
+        html = html.replace('__OWASP_JSON__', json.dumps(owasp_heatmap))
+        html = html.replace('__FINDINGS_JSON__', json.dumps(findings))
+        html = html.replace('__RECS_JSON__', json.dumps(recommendations))
+
+        with open(output_path, 'w') as f:
+            f.write(html)
+
+        if verbose:
+            print(f"{Fore.GREEN}[+] HTML dashboard written to: {output_path}{Style.RESET_ALL}")
 

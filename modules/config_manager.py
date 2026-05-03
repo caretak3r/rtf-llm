@@ -137,6 +137,12 @@ class ConfigManager:
             'ANTHROPIC_API_KEY': ('providers', 'anthropic', 'api_key'),
             'GOOGLE_API_KEY': ('providers', 'google', 'api_key'),
             'COHERE_API_KEY': ('providers', 'cohere', 'api_key'),
+            'GROQ_API_KEY': ('providers', 'groq', 'api_key'),
+            'TOGETHER_API_KEY': ('providers', 'together', 'api_key'),
+            'PERPLEXITY_API_KEY': ('providers', 'perplexity', 'api_key'),
+            'MISTRAL_API_KEY': ('providers', 'mistral', 'api_key'),
+            'FIREWORKS_API_KEY': ('providers', 'fireworks', 'api_key'),
+            'OPENROUTER_API_KEY': ('providers', 'openrouter', 'api_key'),
         }
 
         # 2-level mappings: (section, key) -> direct assignment
@@ -146,6 +152,7 @@ class ConfigManager:
             'LLM_MODEL': ('llm', 'model'),
             'LLM_BASE_URL': ('llm', 'base_url'),
             'LOCAL_MODEL_PATH': ('local_models', 'model_path'),
+            'JUDGE_API_KEY': ('judge', 'api_key'),
         }
 
         for env_var, path in nested_mappings.items():

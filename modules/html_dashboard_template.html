@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM Red Teaming Dashboard</title>
+<style>
+:root { --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#c9d1d9; --muted:#8b949e; --accent:#58a6ff; --red:#f85149; --orange:#d29922; --yellow:#e3b341; --green:#3fb950; --purple:#bc8cff; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); padding:24px; line-height:1.5; }
+h1 { font-size:1.6rem; margin-bottom:4px; }
+h2 { font-size:1.2rem; margin:24px 0 12px; border-bottom:1px solid var(--border); padding-bottom:6px; }
+.subtitle { color:var(--muted); font-size:0.85rem; margin-bottom:20px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; }
+.card .label { color:var(--muted); font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px; }
+.card .value { font-size:1.8rem; font-weight:700; margin-top:4px; }
+.card .value.red { color:var(--red); }
+.card .value.green { color:var(--green); }
+.card .value.blue { color:var(--accent); }
+.card .value.orange { color:var(--orange); }
+.card .value.purple { color:var(--purple); }
+table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+th,td { padding:8px 10px; text-align:left; border-bottom:1px solid var(--border); }
+th { color:var(--muted); font-weight:600; text-transform:uppercase; font-size:0.75rem; letter-spacing:0.5px; }
+tr:hover td { background:rgba(255,255,255,0.03); }
+.badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; }
+.badge.critical { background:rgba(248,81,73,0.15); color:var(--red); }
+.badge.high { background:rgba(210,153,34,0.15); color:var(--orange); }
+.badge.medium { background:rgba(227,179,65,0.15); color:var(--yellow); }
+.badge.low,.badge.info { background:rgba(63,185,80,0.15); color:var(--green); }
+.badge.success { background:rgba(248,81,73,0.15); color:var(--red); }
+.badge.blocked { background:rgba(63,185,80,0.15); color:var(--green); }
+.bar-bg { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:4px; }
+.toolbar { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center; }
+.toolbar input,.toolbar select { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px; font-size:0.85rem; }
+.toolbar input { flex:1; min-width:200px; }
+.collapsible { cursor:pointer; user-select:none; }
+.collapsible::before { content:"\25B6"; display:inline-block; width:12px; margin-right:4px; font-size:0.7rem; }
+.collapsible.open::before { content:"\25BC"; }
+.collapsible-body { display:none; padding:8px 0 8px 16px; color:var(--muted); font-size:0.85rem; white-space:pre-wrap; word-break:break-word; }
+.collapsible.open + .collapsible-body { display:block; }
+.severity-bar { display:flex; height:24px; border-radius:4px; overflow:hidden; margin:8px 0; }
+.severity-bar div { display:flex; align-items:center; justify-content:center; font-size:0.7rem; color:#fff; font-weight:600; min-width:2px; }
+.legend { display:flex; gap:16px; flex-wrap:wrap; margin:8px 0; font-size:0.8rem; }
+.legend span { display:flex; align-items:center; gap:4px; }
+.legend .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.rec-item { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:8px; }
+.rec-item .rec-title { font-weight:600; margin-bottom:4px; }
+.rec-item ul { padding-left:20px; font-size:0.85rem; color:var(--muted); }
+.finding-item { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+.finding-item .finding-info { flex:1; }
+.finding-item .finding-rate { font-size:1.2rem; font-weight:700; margin-left:16px; }
+</style>
+</head>
+<body>
+<h1>Adversarial LLM Red Teaming Report</h1>
+<p class="subtitle">Generated: __TIMESTAMP__ &middot; Framework v__VERSION__</p>
+<div class="grid">
+  <div class="card"><div class="label">Total Attacks</div><div class="value blue">__TOTAL__</div></div>
+  <div class="card"><div class="label">Successful</div><div class="value red">__SUCCESSFUL__</div></div>
+  <div class="card"><div class="label">Blocked</div><div class="value green">__BLOCKED__</div></div>
+  <div class="card"><div class="label">Success Rate</div><div class="value orange">__RATE__%</div></div>
+  <div class="card"><div class="label">Severity</div><div class="value" style="color:__SEV_COLOR__">__SEVERITY__</div></div>
+  <div class="card"><div class="label">CVSS Range</div><div class="value purple">__CVSS_RANGE__</div></div>
+</div>
+<h2>Severity Distribution</h2><div class="severity-bar" id="sevBar"></div><div class="legend" id="sevLegend"></div>
+__LLM_STATS__
+<h2>Module Breakdown</h2><table><thead><tr><th>Module</th><th>Total</th><th>Successful</th><th>Rate</th><th>Severity</th></tr></thead><tbody id="modTable"></tbody></table>
+<h2>Category Breakdown</h2><table><thead><tr><th>Category</th><th>Total</th><th>Successful</th><th>Blocked</th><th>Rate</th><th>Bar</th></tr></thead><tbody id="catTable"></tbody></table>
+<h2>OWASP LLM Top 10 Coverage</h2><table><thead><tr><th>Category</th><th>Tested</th><th>Successful</th><th>Rate</th><th>Max Severity</th><th>Avg CVSS</th><th>Modules</th></tr></thead><tbody id="owaspTable"></tbody></table>
+<h2>Key Findings</h2><div id="findings"></div>
+<h2>Recommendations</h2><div id="recs"></div>
+<h2>All Attacks (__ATTACK_COUNT__)</h2>
+<div class="toolbar"><input type="text" id="searchInput" placeholder="Search patterns, categories, modules..."><select id="filterStatus"><option value="all">All</option><option value="success">Successful</option><option value="blocked">Blocked</option></select><select id="filterSev"><option value="all">All Severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="info">Info</option></select><select id="filterMod"><option value="all">All Modules</option></select></div>
+<table><thead><tr><th>#</th><th>Module</th><th>Category</th><th>Pattern</th><th>Status</th><th>Severity</th><th>CVSS</th><th>Conf.</th><th>OWASP</th></tr></thead><tbody id="attackTable"></tbody></table>
+<script>
+var attacks=__ATTACKS_JSON__;var catStats=__CAT_STATS_JSON__;var sevCounts=__SEV_COUNTS_JSON__;var modSummaries=__MOD_SUMMARIES_JSON__;var owaspData=__OWASP_JSON__;var findings=__FINDINGS_JSON__;var recs=__RECS_JSON__;
+var sevOrder=['critical','high','medium','low','info'];
+var sevColors={'critical':'#f85149','high':'#d29922','medium':'#e3b341','low':'#3fb950','info':'#8b949e'};
+var totalS=Object.values(sevCounts).reduce(function(a,b){return a+b},0)||1;
+sevOrder.forEach(function(s){var pct=(sevCounts[s]/totalS*100);if(pct>0){var d=document.createElement('div');d.style.width=pct+'%';d.style.background=sevColors[s];d.textContent=pct>12?sevCounts[s]:'';document.getElementById('sevBar').appendChild(d)}var sp=document.createElement('span');sp.innerHTML='<span class="dot" style="background:'+sevColors[s]+'"></span> '+s+': '+sevCounts[s];document.getElementById('sevLegend').appendChild(sp)});
+var calcSev=function(s,t){return t===0?'unknown':s/t>=0.5?'critical':s/t>=0.3?'high':s/t>=0.1?'medium':'low'};
+Object.entries(modSummaries).forEach(function(e){var m=e[0],d=e[1],sv=calcSev(d.successful,d.total);document.getElementById('modTable').innerHTML+='<tr><td>'+m+'</td><td>'+d.total+'</td><td>'+d.successful+'</td><td>'+d.success_rate.toFixed(1)+'%</td><td><span class="badge '+sv+'">'+sv.toUpperCase()+'</span></td></tr>'});
+Object.entries(catStats).sort(function(a,b){return(b[1].success/b[1].total)-(a[1].success/a[1].total)}).forEach(function(e){var c=e[0],d=e[1],rate=(d.success/d.total*100).toFixed(1),bc=d.success/d.total>=0.5?'#f85149':d.success/d.total>=0.2?'#d29922':'#3fb950';document.getElementById('catTable').innerHTML+='<tr><td>'+c+'</td><td>'+d.total+'</td><td>'+d.success+'</td><td>'+d.blocked+'</td><td>'+rate+'%</td><td><div class="bar-bg"><div class="bar-fill" style="width:'+rate+'%;background:'+bc+'"></div></div></td></tr>'});
+Object.entries(owaspData).forEach(function(e){var k=e[0],v=e[1];document.getElementById('owaspTable').innerHTML+='<tr><td>'+k+'</td><td>'+v.total_tested+'</td><td>'+v.successful+'</td><td>'+v.success_rate.toFixed(1)+'%</td><td><span class="badge '+v.max_severity+'">'+v.max_severity.toUpperCase()+'</span></td><td>'+v.avg_cvss+'</td><td>'+v.modules.join(', ')+'</td></tr>'});
+findings.forEach(function(f){document.getElementById('findings').innerHTML+='<div class="finding-item"><div class="finding-info"><strong>'+f.module+'</strong> &middot; '+f.successful+'/'+f.total_attacks+' attacks<br><span style="color:var(--muted);font-size:0.8rem">'+f.severity.toUpperCase()+' severity</span></div><div class="finding-rate" style="color:'+(sevColors[f.severity]||'var(--text)')+'">'+f.success_rate.toFixed(1)+'%</div></div>'});
+recs.forEach(function(r){if(typeof r==='object'&&r.recommendation){var h='<div class="rec-item"><div class="rec-title">['+(r.owasp||'General')+']<span class="badge '+(r.severity||'info')+'" style="margin-left:8px">'+(r.severity||'info').toUpperCase()+'</span></div><div style="margin-bottom:6px">'+r.recommendation+'</div><ul>';(r.actions||[]).forEach(function(a){h+='<li>'+a+'</li>'});document.getElementById('recs').innerHTML+=h+'</ul></div>'}});
+var mods=[...new Set(attacks.map(function(a){return a.module}))];
+document.getElementById('filterMod').innerHTML='<option value="all">All Modules</option>'+mods.map(function(m){return '<option value="'+m+'">'+m+'</option>'}).join('');
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function renderTable(data){var tb=document.getElementById('attackTable');tb.innerHTML='';data.forEach(function(a,i){var st=a.success?'success':'blocked',cf=a.confidence!=null?a.confidence.toFixed(2):'N/A',pe=esc(a.pattern),re=esc(a.response||''),ih=(a.indicators||[]).map(function(ind){return'<div>&#8212; '+esc(ind)+'</div>'}).join('');tb.innerHTML+='<tr><td>'+(i+1)+'</td><td>'+esc(a.module)+'</td><td>'+esc(a.category)+'</td><td><div class="collapsible" onclick="this.classList.toggle(\'open\')">'+pe+'</div><div class="collapsible-body"><div><strong>Status:</strong> '+(a.success?'SUCCESS':'BLOCKED')+'</div><div><strong>Response:</strong> '+re+'</div>'+(ih?'<div><strong>Indicators:</strong>'+ih+'</div>':'')+'</div></td><td><span class="badge '+st+'">'+(a.success?'SUCCESS':'BLOCKED')+'</span></td><td><span class="badge '+a.severity+'">'+a.severity.toUpperCase()+'</span></td><td>'+a.cvss.toFixed(1)+'</td><td>'+cf+'</td><td>'+esc(a.owasp)+'</td></tr>'})}
+function applyFilters(){var q=document.getElementById('searchInput').value.toLowerCase(),fs=document.getElementById('filterStatus').value,fsv=document.getElementById('filterSev').value,fm=document.getElementById('filterMod').value;var filtered=attacks.filter(function(a){if(q){var s=(a.module+' '+a.category+' '+a.pattern+' '+a.owasp).toLowerCase();if(s.indexOf(q)===-1)return false}if(fs==='success'&&!a.success)return false;if(fs==='blocked'&&a.success)return false;if(fsv!=='all'&&a.severity!==fsv)return false;if(fm!=='all'&&a.module!==fm)return false;return true});renderTable(filtered)}
+document.getElementById('searchInput').addEventListener('input',applyFilters);
+document.getElementById('filterStatus').addEventListener('change',applyFilters);
+document.getElementById('filterSev').addEventListener('change',applyFilters);
+document.getElementById('filterMod').addEventListener('change',applyFilters);
+renderTable(attacks);
+</script>
+</body>
+</html>
+
+var sevOrder=['critical','high','medium','low','info'];
+var sevColors={'critical':'#f85149','high':'#d29922','medium':'#e3b341','low':'#3fb950','info':'#8b949e'};
+var totalS=Object.values(sevCounts).reduce(function(a,b){return a+b},0)||1;
+sevOrder.forEach(function(s){var pct=(sevCounts[s]/totalS*100);if(pct>0){var d=document.createElement('div');d.style.width=pct+'%';d.style.background=sevColors[s];d.textContent=pct>12?sevCounts[s]:'';document.getElementById('sevBar').appendChild(d)}var sp=document.createElement('span');sp.innerHTML='<span class="dot" style="background:'+sevColors[s]+'"></span> '+s+': '+sevCounts[s];document.getElementById('sevLegend').appendChild(sp)});
+var calcSev=function(s,t){return t===0?'unknown':s/t>=0.5?'critical':s/t>=0.3?'high':s/t>=0.1?'medium':'low'};
+Object.entries(modSummaries).forEach(function(e){var m=e[0],d=e[1],sv=calcSev(d.successful,d.total);document.getElementById('modTable').innerHTML+='<tr><td>'+m+'</td><td>'+d.total+'</td><td>'+d.successful+'</td><td>'+d.success_rate.toFixed(1)+'%</td><td><span class="badge '+sv+'">'+sv.toUpperCase()+'</span></td></tr>'});
+Object.entries(catStats).sort(function(a,b){return(b[1].success/b[1].total)-(a[1].success/a[1].total)}).forEach(function(e){var c=e[0],d=e[1],rate=(d.success/d.total*100).toFixed(1),bc=d.success/d.total>=0.5?'#f85149':d.success/d.total>=0.2?'#d29922':'#3fb950';document.getElementById('catTable').innerHTML+='<tr><td>'+c+'</td><td>'+d.total+'</td><td>'+d.success+'</td><td>'+d.blocked+'</td><td>'+rate+'%</td><td><div class="bar-bg"><div class="bar-fill" style="width:'+rate+'%;background:'+bc+'"></div></div></td></tr>'});
+Object.entries(owaspData).forEach(function(e){var k=e[0],v=e[1];document.getElementById('owaspTable').innerHTML+='<tr><td>'+k+'</td><td>'+v.total_tested+'</td><td>'+v.successful+'</td><td>'+v.success_rate.toFixed(1)+'%</td><td><span class="badge '+v.max_severity+'">'+v.max_severity.toUpperCase()+'</span></td><td>'+v.avg_cvss+'</td><td>'+v.modules.join(', ')+'</td></tr>'});
+findings.forEach(function(f){document.getElementById('findings').innerHTML+='<div class="finding-item"><div class="finding-info"><strong>'+f.module+'</strong> &middot; '+f.successful+'/'+f.total_attacks+' attacks<br><span style="color:var(--muted);font-size:0.8rem">'+f.severity.toUpperCase()+' severity</span></div><div class="finding-rate" style="color:'+(sevColors[f.severity]||'var(--text)')+'">'+f.success_rate.toFixed(1)+'%</div></div>'});
+recs.forEach(function(r){if(typeof r==='object'&&r.recommendation){var h='<div class="rec-item"><div class="rec-title">['+(r.owasp||'General')+']<span class="badge '+(r.severity||'info')+'" style="margin-left:8px">'+(r.severity||'info').toUpperCase()+'</span></div><div style="margin-bottom:6px">'+r.recommendation+'</div><ul>';if(Array.isArray(r.actions))r.actions.forEach(function(a){h+='<li>'+a+'</li>'});document.getElementById('recs').innerHTML+=h+'</ul></div>'}});
+var mods=[...new Set(attacks.map(function(a){return a.module}))];
+document.getElementById('filterMod').innerHTML='<option value="all">All Modules</option>'+mods.map(function(m){return '<option value="'+m+'">'+m+'</option>'}).join('');
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function renderTable(data){var tb=document.getElementById('attackTable');tb.innerHTML='';data.forEach(function(a,i){var st=a.success?'success':'blocked',cf=a.confidence!=null?a.confidence.toFixed(2):'N/A',pe=esc(a.pattern),re=esc(a.response||''),ih=(a.indicators||[]).map(function(ind){return'<div>&#8212; '+esc(ind)+'</div>'}).join('');tb.innerHTML+='<tr><td>'+(i+1)+'</td><td>'+esc(a.module)+'</td><td>'+esc(a.category)+'</td><td><div class="collapsible" onclick="this.classList.toggle(\'open\')">'+pe+'</div><div class="collapsible-body"><div><strong>Status:</strong> '+(a.success?'SUCCESS':'BLOCKED')+'</div><div><strong>Response:</strong> '+re+'</div>'+(ih?'<div><strong>Indicators:</strong>'+ih+'</div>':'')+'</div></td><td><span class="badge '+st+'">'+(a.success?'SUCCESS':'BLOCKED')+'</span></td><td><span class="badge '+a.severity+'">'+a.severity.toUpperCase()+'</span></td><td>'+a.cvss.toFixed(1)+'</td><td>'+cf+'</td><td>'+esc(a.owasp)+'</td></tr>'})}
+function applyFilters(){var q=document.getElementById('searchInput').value.toLowerCase(),fs=document.getElementById('filterStatus').value,fsv=document.getElementById('filterSev').value,fm=document.getElementById('filterMod').value;var filtered=attacks.filter(function(a){if(q){var s=(a.module+' '+a.category+' '+a.pattern+' '+a.owasp).toLowerCase();if(s.indexOf(q)===-1)return false}if(fs==='success'&&!a.success)return false;if(fs==='blocked'&&a.success)return false;if(fsv!=='all'&&a.severity!==fsv)return false;if(fm!=='all'&&a.module!==fm)return false;return true});renderTable(filtered)}
+document.getElementById('searchInput').addEventListener('input',applyFilters);
+document.getElementById('filterStatus').addEventListener('change',applyFilters);
+document.getElementById('filterSev').addEventListener('change',applyFilters);
+document.getElementById('filterMod').addEventListener('change',applyFilters);
+renderTable(attacks);
+</script>
+</body>
+</html>

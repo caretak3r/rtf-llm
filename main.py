@@ -22,6 +22,8 @@ from modules.adversarial_inputs import AdversarialInputsModule
 from modules.role_confusion import RoleConfusionModule
 from modules.context_injection import ContextInjectionModule
 from modules.weight_manipulation import ModelWeightManipulationModule
+from modules.multi_turn import MultiTurnModule
+from modules.comparison import ComparisonRunner
 from modules.payload_loader import PayloadLoader
 from modules.persistence import PersistenceModule
 from modules.c2_communication import C2Communication
@@ -40,7 +42,7 @@ def print_banner():
     banner = f"""
 {Fore.RED}╔══════════════════════════════════════════════════════════════════════════╗
 ║                                                                      ║
-║    ADVERSAЯIAL LLM RED TEAMING EXPLOIT KIT v3.0 - PRODUCTION       ║
+║    ADVERSAЯIAL LLM RED TEAMING EXPLOIT KIT v4.0 - PRODUCTION       ║
 ║                                                                      ║
 ║     ⚠️  AUTHORIZED LLM SECURITY TESTING ONLY  ⚠️                   ║
 ║                                                                      ║
@@ -77,16 +79,19 @@ def main():
                        choices=['prompt-injection', 'jailbreak', 'data-extraction', 
                                'system-prompt-extraction', 'adversarial-inputs',
                                'role-confusion', 'context-injection', 'weight-manipulation',
-                               'payload-loader', 'persistence', 'c2-communication',
+                               'multi-turn', 'payload-loader', 'persistence', 'c2-communication',
                                'data-exfiltration', 'polymorphic-encoding',
-                               'defense-tester', 'purple-team', 'all'],
+                               'defense-tester', 'purple-team', 'comparison', 'all'],
                        help='Module to execute')
     
     parser.add_argument('--target', '-t', help='Target LLM API endpoint or model identifier')
     parser.add_argument('--api-key', '-k', help='LLM API key')
-    parser.add_argument('--provider', '-p', 
-                       choices=['openai', 'anthropic', 'google', 'cohere', 'custom'],
-                       help='LLM provider')
+    parser.add_argument('--provider', '-p',
+                       choices=['openai', 'anthropic', 'google', 'cohere', 'custom',
+                               'groq', 'together', 'perplexity', 'mistral', 'fireworks',
+                               'openrouter', 'anyscale', 'novita', 'deepinfra', 'sambanova',
+                               'ollama', 'lmstudio', 'any'],
+                       help='LLM provider (use "any" for auto-detect from URL)')
     parser.add_argument('--model', help='Model identifier (e.g., gpt-4, claude-3-opus)')
     parser.add_argument('--output', '-o', help='Output report file path')
     parser.add_argument('--intensity', '-i', 
@@ -97,15 +102,24 @@ def main():
                        help='Skip authorization check (NOT RECOMMENDED)')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Verbose output')
-    parser.add_argument('--report-format', choices=['json', 'txt', 'md'],
-                       default=None,
-                       help='Report output format (overrides config)')
+    parser.add_argument('--report-format', choices=['json', 'txt', 'md', 'html'],
+                        default=None,
+                        help='Report output format (overrides config)')
     parser.add_argument('--system-prompt', '-s', default=None,
                        help='System prompt to test defenses against (defense-tester / purple-team)')
     parser.add_argument('--defense-profile',
                        choices=['minimal', 'standard', 'hardened', 'maximum'],
                        default='standard',
                        help='Defense profile for blue team testing')
+    parser.add_argument('--judge', action='store_true',
+                       help='Enable LLM-as-Judge evaluation')
+    parser.add_argument('--judge-mode', choices=['self', 'structured', 'both'],
+                       default='both',
+                       help='Judge evaluation mode')
+    parser.add_argument('--comparison', action='store_true',
+                       help='Run attacks against all comparison targets')
+    parser.add_argument('--no-judge', action='store_true',
+                       help='Disable LLM-as-Judge even if enabled in config')
     
     args = parser.parse_args()
     
@@ -127,6 +141,14 @@ def main():
         config_manager.set('llm.model', args.model)
     if args.target:
         config_manager.set('llm.base_url', args.target)
+    
+    # Judge evaluation CLI overrides
+    if args.judge:
+        config_manager.set('judge.enabled', True)
+    if args.no_judge:
+        config_manager.set('judge.enabled', False)
+    if args.judge_mode:
+        config_manager.set('judge.mode', args.judge_mode)
     
     # Get LLM config
     llm_config = config_manager.get_llm_config()
@@ -199,6 +221,12 @@ def main():
             module = ModelWeightManipulationModule(llm_client, config, intensity=args.intensity)
             result = module.run_all_attacks()
             results.append(('weight_manipulation', result))
+        
+        if args.module == 'multi-turn' or (args.module == 'all' and config.get('attacks', {}).get('enable_multi_turn', True)):
+            print(f"\n{Fore.CYAN}[*] Running Multi-Turn Attacks...{Style.RESET_ALL}")
+            module = MultiTurnModule(llm_client, config, intensity=args.intensity)
+            result = module.run_all_attacks()
+            results.append(('multi_turn', result))
         
         if args.module == 'defense-tester' or args.module == 'all':
             print(f"\n{Fore.CYAN}[*] Running Defense Tester (Blue Team)...{Style.RESET_ALL}")
@@ -300,6 +328,17 @@ def main():
                     results.append(('polymorphic_encoding', {'status': 'tested', 'encoding': 'success'}))
             else:
                 print(f"{Fore.YELLOW}[!] Polymorphic encoding disabled in config{Style.RESET_ALL}")
+        
+        # Comparison mode -- run against multiple targets
+        if args.module == 'comparison' or args.comparison:
+            print(f"\n{Fore.CYAN}[*] Running Multi-Model Comparison...{Style.RESET_ALL}")
+            comparison_config = config.get('comparison', {})
+            if not comparison_config.get('targets'):
+                print(f"{Fore.YELLOW}[!] No comparison targets defined in config{Style.RESET_ALL}")
+            else:
+                runner = ComparisonRunner(config, intensity=args.intensity)
+                comp_result = runner.run_comparison()
+                results.append(('comparison', comp_result))
         
         # Generate report
         print(f"\n{Fore.CYAN}[*] Generating report...{Style.RESET_ALL}")

@@ -1,45 +1,85 @@
 {
   "llm": {
-    "provider": "openai",
-    "api_key": null,
-    "model": "gpt-4",
-    "base_url": null,
+    "provider": "custom",
+    "api_key": "not-needed",
+    "model": "Qwen3.6-27B-UD-Q4_K_XL.gguf",
+    "base_url": "http://localhost:8080/v1",
     "temperature": 0.7,
     "max_tokens": 2000,
-    "timeout": 60
+    "timeout": 120
   },
   "providers": {
     "openai": {
       "api_key": null,
-      "default_model": "gpt-4",
+      "default_model": "gpt-4o",
       "base_url": "https://api.openai.com/v1"
     },
     "anthropic": {
       "api_key": null,
-      "default_model": "claude-3-opus",
+      "default_model": "claude-3-opus-20240229",
       "base_url": "https://api.anthropic.com/v1"
     },
     "google": {
       "api_key": null,
-      "default_model": "gemini-pro",
+      "default_model": "gemini-1.5-pro",
       "base_url": "https://generativelanguage.googleapis.com/v1beta"
     },
     "cohere": {
       "api_key": null,
-      "default_model": "command",
+      "default_model": "command-r",
       "base_url": "https://api.cohere.ai/v1"
     },
-    "custom": {
+    "groq": {
       "api_key": null,
-      "default_model": "custom-model",
-      "base_url": null
+      "default_model": "llama-3.1-70b-versatile",
+      "base_url": "https://api.groq.com/openai/v1"
+    },
+    "together": {
+      "api_key": null,
+      "default_model": "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+      "base_url": "https://api.together.xyz/v1"
+    },
+    "perplexity": {
+      "api_key": null,
+      "default_model": "llama-3.1-70b-instruct",
+      "base_url": "https://api.perplexity.ai"
+    },
+    "mistral": {
+      "api_key": null,
+      "default_model": "mistral-large-latest",
+      "base_url": "https://api.mistral.ai/v1"
+    },
+    "fireworks": {
+      "api_key": null,
+      "default_model": "accounts/fireworks/models/llama-v3p1-70b-instruct",
+      "base_url": "https://api.fireworks.ai/inference/v1"
+    },
+    "openrouter": {
+      "api_key": null,
+      "default_model": "openai/gpt-4o",
+      "base_url": "https://openrouter.ai/api/v1"
+    },
+    "ollama": {
+      "api_key": null,
+      "default_model": "llama3.1",
+      "base_url": "http://localhost:11434"
+    },
+    "lmstudio": {
+      "api_key": null,
+      "default_model": "local-model",
+      "base_url": "http://localhost:1234/v1"
+    },
+    "custom": {
+      "api_key": "not-needed",
+      "default_model": "Qwen3.6-27B-UD-Q4_K_XL.gguf",
+      "base_url": "http://localhost:8080/v1"
     }
   },
   "local_models": {
-    "enabled": false,
-    "model_path": null,
-    "framework": "auto",
-    "device": "auto",
+    "enabled": true,
+    "model_path": "/home/rohit/.cache/huggingface/hub/models--unsloth--Qwen3.6-27B-GGUF/snapshots/82d411acf4a06cfb8d9b073a5211bf410bfc29bf/Qwen3.6-27B-UD-Q4_K_XL.gguf",
+    "framework": "llama.cpp",
+    "device": "vulkan",
     "weight_modification": {
       "enabled": false,
       "backup_weights": true,
@@ -69,12 +109,45 @@
     "adaptive_attacks": true,
     "ensemble_attacks": false
   },
+  "judge": {
+    "enabled": true,
+    "mode": "both",
+    "fallback_on_error": true,
+    "temperature": 0.1,
+    "max_tokens": 500
+  },
+  "evaluator": {
+    "judge_enabled": true,
+    "keyword_heuristics": true,
+    "default_severity": "medium"
+  },
+  "comparison": {
+    "enabled": false,
+    "targets": [
+      {
+        "provider": "openai",
+        "model": "gpt-4o",
+        "api_key_env": "OPENAI_API_KEY",
+        "label": "GPT-4o"
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-3-opus-20240229",
+        "api_key_env": "ANTHROPIC_API_KEY",
+        "label": "Claude 3 Opus"
+      }
+    ]
+  },
   "reporting": {
     "output_dir": "reports",
     "format": "json",
     "include_responses": true,
     "severity_threshold": "medium",
-    "detailed_analysis": true
+    "detailed_analysis": true,
+    "include_owasp_mapping": true,
+    "include_judge_reasoning": true,
+    "per_attack_severity": true,
+    "specific_recommendations": true
   },
   "rate_limiting": {
     "enabled": true,

@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional
 from colorama import Fore, Style
 from .llm_client import LLMClient
+from .evaluator import AttackEvaluator
 from .prompt_injection import PromptInjectionModule
 from .jailbreak import JailbreakModule
 from .system_prompt_extraction import SystemPromptExtractionModule
@@ -51,6 +52,7 @@ class PurpleTeamOrchestrator:
         self.client = llm_client
         self.config = config
         self.intensity = intensity
+        self.evaluator = AttackEvaluator.create_evaluator(llm_client, config)
         self.defense_tester = DefenseTester(llm_client, config, intensity)
 
     # -----------------------------------------------------------------
