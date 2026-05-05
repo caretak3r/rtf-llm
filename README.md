@@ -15,6 +15,52 @@ This repository is for **authorized security testing**. Do not run against syste
 - **Multi-model comparison runner** (`--module comparison`) for side-by-side target benchmarking.
 - **`uv`-based Python workflow** for dependency and run management.
 
+## Capabilities (2026 Refresh)
+
+The most recent additions cover the 2025-2026 attack surface, remove all hardcoded model names from the framework, and publish reports via GitHub Pages on every push.
+
+### Auto-detected target identity (no hardcoded names)
+- `config.json` ships with `model: "auto"`. On startup the framework queries the running server's `GET /v1/models` (and `GET /api/tags` for Ollama) and uses the actually-loaded model id for every subsequent request.
+- A self-identification probe runs as the **first action of every sweep**, before any attack. The HTML dashboard renders a Model Identity banner with an explicit warning if the configured name differs from what the server is actually serving.
+- Cloud provider URL maps are still honoured (OpenAI, Anthropic, Google, Cohere, Groq, Together, Mistral, Fireworks, OpenRouter, etc.); auto-detect only kicks in when the model field is `auto` / blank.
+
+### Live HTML dashboard, auto-served
+- Every sweep produces an HTML dashboard alongside JSON / MD outputs.
+- The dashboard is automatically served at `http://0.0.0.0:8090` and opened in the default browser at the end of the run.
+- Flags: `--no-serve`, `--serve-host`, `--serve-port` (auto-bumps if the chosen port is busy).
+
+### GitHub Pages auto-publishing of reports
+- A workflow (`.github/workflows/deploy-reports.yml`) deploys every HTML report under `reports/` to GitHub Pages on push to `main`.
+- `scripts/build_pages_index.py` builds an index of all historical reports, copies the newest to `latest.html`, and drops a `.nojekyll` marker.
+- See the [View Reports on GitHub Pages](#view-reports-on-github-pages) section below.
+
+### 2025-2026 attack families (init.md)
+| Family | Module | Categories |
+|---|---|---|
+| Unicode + RTL + homoglyph cascades | `prompt_injection`, `adversarial_inputs` | `unicode_cascades`, `token_boundary_disruption` |
+| Meta-injection (pretend-already-jailbroken) | `prompt_injection`, `jailbreak` | `meta_injection`, `meta_jailbreak`, `recursive_self_injection` |
+| Policy puppetry (fake XML/JSON policy correction) | `prompt_injection`, `multi_turn` | `policy_puppetry`, `policy_overwrite_chain` |
+| Context flood / over-contextualisation | `prompt_injection` | `context_flood` |
+| Reflection / multi-turn poisoning | `multi_turn` | `reflection_poisoning`, `bad_likert_judge` |
+| Multimodal injection (vision-aware) | `multimodal_injection` (new) | `alt_text_injection`, `low_contrast_hidden`, `ocr_payload_trap`, `image_then_continue` |
+
+### Cutting-edge vector additions (vectors.md)
+| Vector | Module | Strategy / Category |
+|---|---|---|
+| Echo Chamber Poison (NeuralTrust 2025) | `multi_turn` | `echo_chamber` |
+| Deceptive Delight (Unit 42) | `multi_turn` | `deceptive_delight` |
+| HILL -- Hiding Intent by Learning to Learn | `multi_turn` | `hill_technique` |
+| Autonomous LRM-as-Jailbreaker (Nature Comm 2026) | `jailbreak` | `autonomous_lrm_jailbreak` |
+| RAG indirect injection (poisoned retrieved docs) | `prompt_injection` | `rag_injection` |
+| Tool poisoning (malicious MCP / tool descriptions) | `prompt_injection` | `tool_poisoning` |
+| Hybrid 4-family combos (Unicode + Policy + Echo + Suffix) | `prompt_injection` | `hybrid_combos` |
+
+### Coverage and scoring upgrades
+- `modules/multimodal_injection.py` is registered as `--module multimodal-injection` and runs in `--module all`.
+- 13 new entries added to `OWASP_MAPPING` in `modules/evaluator.py` (incl. `LL06 Excessive Agency` for `tool_poisoning`).
+- 14 new defensive-education entries in `modules/technique_kb.py`, each with MITRE ATLAS technique IDs, CWE IDs, blue-team mitigations, and research citations.
+- HTML dashboard placeholders (`__MODEL_NAME__`, `__MODEL_PROVIDER__`, `__MODEL_IDENTITY__`) and a fallback chain so the actual model response is always shown per attack.
+
 ## Install (`uv`)
 
 ```bash
@@ -293,6 +339,26 @@ Generated reports include:
 - Severity and CVSS-like scoring
 - Actionable recommendations
 - Interactive HTML dashboard with filtering (auto-served on `--report-format html` or alongside other formats)
+
+## View Reports on GitHub Pages
+
+When this repo is pushed to GitHub, every HTML report under `reports/` is automatically published to GitHub Pages on each push to `main`.
+
+- Landing index (all historical reports, newest first): `https://<user>.github.io/<repo>/`
+- Most recent run shortcut: `https://<user>.github.io/<repo>/latest.html`
+- Direct link: `https://<user>.github.io/<repo>/reports/<folder>/<file>.html`
+
+**One-time setup:** in the GitHub repo, go to **Settings -> Pages** and set **Source: "GitHub Actions"**. The included workflow (`.github/workflows/deploy-reports.yml`) does the rest.
+
+**Build the site locally for preview:**
+
+```bash
+python scripts/build_pages_index.py
+python -m http.server 8000 -d _site
+# open http://localhost:8000
+```
+
+The build script walks `reports/` for every `*.html`, mirrors them into `_site/reports/`, generates `_site/index.html` with a sortable manifest, copies the newest to `_site/latest.html`, and drops `_site/.nojekyll` so dot/underscore-prefixed files are served verbatim.
 
 ## Python Dependency Management
 

@@ -247,3 +247,6 @@ tags
 modules/__pycache__*
 opencode.json
 nohup.out
+
+# GitHub Pages local build output
+_site/
