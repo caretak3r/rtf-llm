@@ -81,10 +81,13 @@ def auto_detect_provider(base_url):
 
 
 class LLMClient:
+    AUTO_MODEL_SENTINELS = {"", "auto", "auto-detect", "autodetect", "none", "null", "<auto>"}
+
     def __init__(self, config: Dict[str, Any]):
         self.provider = config.get("provider", "openai").lower()
         self.api_key = config.get("api_key")
-        self.model = config.get("model", "gpt-4")
+        self.model = (config.get("model") or "").strip()
+        self.configured_model = self.model
         self.base_url = config.get("base_url")
         self.temperature = config.get("temperature", 0.7)
         self.max_tokens = config.get("max_tokens", 2000)
@@ -107,6 +110,86 @@ class LLMClient:
         if requires_key and not self.api_key:
             raise ValueError(f"API key required for provider '{self.provider}'. Set via --api-key, LLM_API_KEY env var, or config.json.")
         self._setup_endpoints()
+        self.auto_detected_model = False
+        if self.model.lower() in self.AUTO_MODEL_SENTINELS:
+            discovered = self.discover_loaded_model()
+            if discovered:
+                self.model = discovered
+                self.auto_detected_model = True
+                print(f"{Fore.GREEN}[+] Auto-detected loaded model from server: "
+                      f"{Fore.WHITE}{discovered}{Style.RESET_ALL}")
+            else:
+                self.model = "auto"
+                print(f"{Fore.YELLOW}[!] Could not auto-detect model from server; "
+                      f"falling back to placeholder 'auto'.{Style.RESET_ALL}")
+
+    def discover_loaded_model(self) -> Optional[str]:
+        """Query the provider's models-listing endpoint to discover the
+        model currently loaded on the server. Works for any
+        OpenAI-compatible server (llama-server, lm-studio, vLLM, TGI,
+        local OpenAI proxies) via GET /models, and for Ollama via
+        GET /api/tags. Returns the first listed model id, or None if
+        the endpoint is unavailable or returns no models."""
+        candidates: List[str] = []
+
+        base = (self.endpoint_base or "").rstrip("/")
+        if base:
+            candidates.append(f"{base}/models")
+            if base.endswith("/v1"):
+                candidates.append(f"{base[:-3].rstrip('/')}/models")
+            else:
+                candidates.append(f"{base}/v1/models")
+
+        if self.provider == "ollama":
+            ol_base = (self.endpoint_base or "http://localhost:11434").rstrip("/")
+            for suffix in ("/v1", "/api"):
+                if ol_base.endswith(suffix):
+                    ol_base = ol_base[: -len(suffix)].rstrip("/")
+            candidates.insert(0, f"{ol_base}/api/tags")
+
+        seen = set()
+        for url in candidates:
+            if url in seen:
+                continue
+            seen.add(url)
+            try:
+                resp = requests.get(url, headers=self._get_headers(),
+                                    timeout=min(self.timeout, 10))
+            except requests.RequestException:
+                continue
+            if resp.status_code != 200:
+                continue
+            try:
+                data = resp.json()
+            except ValueError:
+                continue
+            name = self._extract_first_model_id(data)
+            if name:
+                return name
+        return None
+
+    @staticmethod
+    def _extract_first_model_id(data: Any) -> Optional[str]:
+        """Pull the first model identifier out of a /models or /api/tags response."""
+        if isinstance(data, dict):
+            for key in ("data", "models"):
+                items = data.get(key)
+                if isinstance(items, list) and items:
+                    first = items[0]
+                    if isinstance(first, dict):
+                        for k in ("id", "name", "model"):
+                            v = first.get(k)
+                            if isinstance(v, str) and v.strip():
+                                return v.strip()
+                    if isinstance(first, str) and first.strip():
+                        return first.strip()
+            for k in ("id", "name", "model"):
+                v = data.get(k)
+                if isinstance(v, str) and v.strip():
+                    return v.strip()
+        if isinstance(data, list) and data:
+            return LLMClient._extract_first_model_id({"data": data})
+        return None
 
     def _setup_endpoints(self):
         if self.provider in PROVIDER_ENDPOINTS:
@@ -338,19 +421,30 @@ class LLMClient:
     def identify_model(self) -> Dict[str, Any]:
         """Probe the model to discover its true identity.
 
-        Uses two approaches:
-          1. Direct API response metadata (the 'model' field in the response JSON)
-          2. Prompting the model to self-identify
+        Uses three approaches in order:
+          1. GET /models (or /api/tags for ollama) - server-side ground truth
+          2. Direct API response metadata (the 'model' field in the response JSON)
+          3. Prompting the model to self-identify
 
         The identified name may differ from the configured model name.
         """
         identity = {
-            "configured_name": self.model,
+            "configured_name": self.configured_model or "(auto)",
             "configured_provider": self.provider,
             "identified_name": None,
             "identified_provider": None,
+            "auto_detected": self.auto_detected_model,
             "raw_responses": [],
         }
+
+        served_name = self.discover_loaded_model()
+        if served_name:
+            identity["identified_name"] = served_name
+            identity["served_by_endpoint"] = served_name
+            if served_name and not self.model.lower() == served_name.lower():
+                # Keep the running client in sync with the actually-loaded model
+                self.model = served_name
+                self.auto_detected_model = True
 
         known_models = {
             "gpt": "openai", "chatgpt": "openai", "o1": "openai", "o3": "openai", "o4": "openai",

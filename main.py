@@ -203,10 +203,12 @@ def main():
         provider = llm_config.get('provider', 'openai')
         llm_config['api_key'] = config_manager.prompt_for_api_key(provider)
     
-    # Initialize LLM client
+    # Initialize LLM client (auto-discovers loaded model from server if config model is 'auto'/empty)
     try:
         llm_client = LLMClient(llm_config)
-        print(f"{Fore.GREEN}[+] LLM client initialized: {llm_config['provider']}/{llm_config['model']}{Style.RESET_ALL}")
+        active_model = llm_client.model or "(unknown)"
+        print(f"{Fore.GREEN}[+] LLM client initialized: "
+              f"{llm_client.provider}/{active_model}{Style.RESET_ALL}")
     except Exception as e:
         print(f"{Fore.RED}[!] Failed to initialize LLM client: {e}{Style.RESET_ALL}")
         sys.exit(1)
@@ -218,8 +220,15 @@ def main():
     identified_provider = model_identity['identified_provider']
     print(f"{Fore.GREEN}[+] Model identified: {Fore.WHITE}{identified_name}{Style.RESET_ALL}"
           f"  (provider: {identified_provider})")
-    if identified_name != llm_config.get('model', ''):
-        print(f"{Fore.YELLOW}[!] Config says '{llm_config.get('model')}' but model self-reports as '{identified_name}'{Style.RESET_ALL}")
+    served = model_identity.get('served_by_endpoint')
+    if served:
+        print(f"{Fore.GREEN}[+] Server /models endpoint reports loaded model: "
+              f"{Fore.WHITE}{served}{Style.RESET_ALL}")
+    configured_name = (llm_config.get('model') or '').strip()
+    if configured_name and configured_name.lower() not in LLMClient.AUTO_MODEL_SENTINELS \
+            and identified_name and identified_name.lower() != configured_name.lower():
+        print(f"{Fore.YELLOW}[!] Config requested '{configured_name}' but server is "
+              f"actually running '{identified_name}'.{Style.RESET_ALL}")
     
     # Initialize report generator
     reporting_config = config.get('reporting', {})
