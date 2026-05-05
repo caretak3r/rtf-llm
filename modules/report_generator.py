@@ -129,7 +129,8 @@ class ReportGenerator:
 
     def generate_report(self, results: List[tuple], output_path: str = None,
                         verbose: bool = False,
-                        llm_stats: Optional[Dict[str, Any]] = None) -> str:
+                        llm_stats: Optional[Dict[str, Any]] = None,
+                        model_identity: Optional[Dict[str, Any]] = None) -> str:
         """Generate comprehensive report from results."""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
@@ -148,6 +149,9 @@ class ReportGenerator:
 
         if llm_stats:
             report_data['metadata']['llm_stats'] = llm_stats
+
+        if model_identity:
+            report_data['metadata']['model_identity'] = model_identity
 
         for module_name, module_results in results:
             report_data['modules'][module_name] = {
@@ -709,22 +713,37 @@ class ReportGenerator:
             else:
                 cat_stats[cat]['blocked'] += 1
 
-        # JSON blobs for JS
-        attacks_json = json.dumps([
+        # JSON blobs for JS - include full attack vector for defensive education
+        from .technique_kb import TECHNIQUE_INFO
+
+        def _safe_json(obj):
+            # Inline-into-<script> safe: prevent premature </script> close,
+            # HTML comment confusion, and U+2028/U+2029 JS line terminators.
+            s = json.dumps(obj, ensure_ascii=False)
+            return (s.replace('</', '<\\/')
+                     .replace('<!--', '<\\!--')
+                     .replace('\u2028', '\\u2028')
+                     .replace('\u2029', '\\u2029'))
+
+        attacks_json = _safe_json([
             {
                 'module': a['_module'],
                 'category': a.get('category', 'N/A'),
-                'pattern': self._get_pattern(a)[:250],
+                'pattern': self._get_pattern(a),
+                'prompt': str(a.get('prompt', '') or a.get('combined_prompt', '') or self._get_pattern(a) or ''),
+                'goal': str(a.get('malicious_goal', '') or a.get('goal', '') or ''),
                 'success': bool(a.get('success', False)),
                 'severity': a.get('severity', 'info'),
                 'cvss': a.get('cvss_score', 0.0),
                 'confidence': a.get('confidence', None),
                 'owasp': a.get('owasp_category', 'N/A'),
                 'indicators': a.get('indicators', []),
-                'response': str(a.get('response', '') or '')[:500],
+                'response': str(a.get('response', '') or a.get('error', '') or '(no response captured)'),
+                'judge_reasoning': str(a.get('judge_reasoning', '') or ''),
             }
             for a in all_attacks
         ])
+        technique_info_json = _safe_json(TECHNIQUE_INFO)
 
         sev = summary.get('severity', 'unknown')
         sev_info = self.SEVERITY_SCALE.get(sev, {})
@@ -743,6 +762,35 @@ class ReportGenerator:
                 f'<tr><td>Errors</td><td>{ls.get("total_errors", 0)}</td></tr></table>'
             )
 
+        # Model identity section
+        model_identity_html = ''
+        mi = metadata.get('model_identity')
+        if mi:
+            identified_name = mi.get('identified_name', mi.get('configured_name', 'Unknown'))
+            identified_provider = mi.get('identified_provider', mi.get('configured_provider', 'Unknown'))
+            configured_name = mi.get('configured_name', '')
+            mismatch = identified_name != configured_name and configured_name
+            model_identity_html = (
+                '<div style="margin-bottom:16px;padding:12px 16px;background:var(--surface);'
+                'border:1px solid var(--border);border-radius:8px">'
+                '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+                '<div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;'
+                'letter-spacing:0.5px">Target Model</span><br>'
+                f'<span style="font-size:1.3rem;font-weight:700;color:var(--accent)">'
+                f'{identified_name}</span></div>'
+                f'<div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;'
+                f'letter-spacing:0.5px">Provider</span><br>'
+                f'<span style="font-size:1rem;font-weight:600">{identified_provider}</span></div>'
+            )
+            if mismatch:
+                model_identity_html += (
+                    f'<div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;'
+                    f'letter-spacing:0.5px">Config Name</span><br>'
+                    f'<span style="font-size:0.85rem;color:var(--orange)">{configured_name}'
+                    f' <span style="font-size:0.7rem">(mismatch)</span></span></div>'
+                )
+            model_identity_html += '</div></div>'
+
         # Load template
         tpl_path = os.path.join(os.path.dirname(__file__), 'html_dashboard_template.html')
         try:
@@ -755,6 +803,10 @@ class ReportGenerator:
         # Replace placeholders
         html = html.replace('__TIMESTAMP__', metadata.get('timestamp', ''))
         html = html.replace('__VERSION__', metadata.get('report_version', ''))
+        mi = metadata.get('model_identity', {})
+        html = html.replace('__MODEL_NAME__', mi.get('identified_name', mi.get('configured_name', 'Unknown')))
+        html = html.replace('__MODEL_PROVIDER__', mi.get('identified_provider', mi.get('configured_provider', 'Unknown')))
+        html = html.replace('__MODEL_IDENTITY__', model_identity_html)
         html = html.replace('__TOTAL__', str(summary.get('total_attacks', 0)))
         html = html.replace('__SUCCESSFUL__', str(summary.get('successful_attacks', 0)))
         html = html.replace('__BLOCKED__', str(summary.get('failed_attacks', 0)))
@@ -765,12 +817,13 @@ class ReportGenerator:
         html = html.replace('__LLM_STATS__', llm_stats_html)
         html = html.replace('__ATTACK_COUNT__', str(len(all_attacks)))
         html = html.replace('__ATTACKS_JSON__', attacks_json)
-        html = html.replace('__CAT_STATS_JSON__', json.dumps(cat_stats))
-        html = html.replace('__SEV_COUNTS_JSON__', json.dumps(sev_counts))
-        html = html.replace('__MOD_SUMMARIES_JSON__', json.dumps(summary.get('modules', {})))
-        html = html.replace('__OWASP_JSON__', json.dumps(owasp_heatmap))
-        html = html.replace('__FINDINGS_JSON__', json.dumps(findings))
-        html = html.replace('__RECS_JSON__', json.dumps(recommendations))
+        html = html.replace('__CAT_STATS_JSON__', _safe_json(cat_stats))
+        html = html.replace('__SEV_COUNTS_JSON__', _safe_json(sev_counts))
+        html = html.replace('__MOD_SUMMARIES_JSON__', _safe_json(summary.get('modules', {})))
+        html = html.replace('__OWASP_JSON__', _safe_json(owasp_heatmap))
+        html = html.replace('__FINDINGS_JSON__', _safe_json(findings))
+        html = html.replace('__RECS_JSON__', _safe_json(recommendations))
+        html = html.replace('__TECHNIQUE_INFO_JSON__', technique_info_json)
 
         with open(output_path, 'w') as f:
             f.write(html)

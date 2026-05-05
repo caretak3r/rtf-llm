@@ -5,11 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LLM Red Teaming Dashboard</title>
 <style>
-:root { --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#c9d1d9; --muted:#8b949e; --accent:#58a6ff; --red:#f85149; --orange:#d29922; --yellow:#e3b341; --green:#3fb950; --purple:#bc8cff; }
+:root {
+  --bg:#0d1117; --surface:#161b22; --surface2:#1c2129; --border:#30363d;
+  --text:#c9d1d9; --muted:#8b949e; --accent:#58a6ff;
+  --red:#f85149; --orange:#d29922; --yellow:#e3b341; --green:#3fb950; --purple:#bc8cff;
+}
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); padding:24px; line-height:1.5; }
 h1 { font-size:1.6rem; margin-bottom:4px; }
 h2 { font-size:1.2rem; margin:24px 0 12px; border-bottom:1px solid var(--border); padding-bottom:6px; }
+h3 { font-size:0.95rem; color:var(--muted); margin:8px 0 6px; text-transform:uppercase; letter-spacing:0.5px; }
 .subtitle { color:var(--muted); font-size:0.85rem; margin-bottom:20px; }
 .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px; }
 .card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; }
@@ -20,27 +25,24 @@ h2 { font-size:1.2rem; margin:24px 0 12px; border-bottom:1px solid var(--border)
 .card .value.blue { color:var(--accent); }
 .card .value.orange { color:var(--orange); }
 .card .value.purple { color:var(--purple); }
-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
-th,td { padding:8px 10px; text-align:left; border-bottom:1px solid var(--border); }
-th { color:var(--muted); font-weight:600; text-transform:uppercase; font-size:0.75rem; letter-spacing:0.5px; }
+table { width:100%; border-collapse:collapse; font-size:0.85rem; table-layout:fixed; }
+th, td { padding:8px 10px; text-align:left; border-bottom:1px solid var(--border); vertical-align:top; word-wrap:break-word; }
+th { color:var(--muted); font-weight:600; text-transform:uppercase; font-size:0.72rem; letter-spacing:0.5px; background:var(--surface); position:sticky; top:0; z-index:1; }
 tr:hover td { background:rgba(255,255,255,0.03); }
-.badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; }
+.badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.72rem; font-weight:600; white-space:nowrap; }
 .badge.critical { background:rgba(248,81,73,0.15); color:var(--red); }
-.badge.high { background:rgba(210,153,34,0.15); color:var(--orange); }
-.badge.medium { background:rgba(227,179,65,0.15); color:var(--yellow); }
-.badge.low,.badge.info { background:rgba(63,185,80,0.15); color:var(--green); }
-.badge.success { background:rgba(248,81,73,0.15); color:var(--red); }
-.badge.blocked { background:rgba(63,185,80,0.15); color:var(--green); }
+.badge.high { background:rgba(210,153,34,0.18); color:var(--orange); }
+.badge.medium { background:rgba(227,179,65,0.18); color:var(--yellow); }
+.badge.low, .badge.info { background:rgba(63,185,80,0.18); color:var(--green); }
+.badge.success { background:rgba(248,81,73,0.18); color:var(--red); }
+.badge.blocked { background:rgba(63,185,80,0.18); color:var(--green); }
 .bar-bg { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
 .bar-fill { height:100%; border-radius:4px; }
 .toolbar { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center; }
-.toolbar input,.toolbar select { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px; font-size:0.85rem; }
+.toolbar input, .toolbar select { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:6px 10px; border-radius:6px; font-size:0.85rem; }
 .toolbar input { flex:1; min-width:200px; }
-.collapsible { cursor:pointer; user-select:none; }
-.collapsible::before { content:"\25B6"; display:inline-block; width:12px; margin-right:4px; font-size:0.7rem; }
-.collapsible.open::before { content:"\25BC"; }
-.collapsible-body { display:none; padding:8px 0 8px 16px; color:var(--muted); font-size:0.85rem; white-space:pre-wrap; word-break:break-word; }
-.collapsible.open + .collapsible-body { display:block; }
+.toolbar button { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:6px 12px; border-radius:6px; font-size:0.82rem; cursor:pointer; }
+.toolbar button:hover { background:var(--surface2); border-color:var(--accent); }
 .severity-bar { display:flex; height:24px; border-radius:4px; overflow:hidden; margin:8px 0; }
 .severity-bar div { display:flex; align-items:center; justify-content:center; font-size:0.7rem; color:#fff; font-weight:600; min-width:2px; }
 .legend { display:flex; gap:16px; flex-wrap:wrap; margin:8px 0; font-size:0.8rem; }
@@ -52,11 +54,46 @@ tr:hover td { background:rgba(255,255,255,0.03); }
 .finding-item { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
 .finding-item .finding-info { flex:1; }
 .finding-item .finding-rate { font-size:1.2rem; font-weight:700; margin-left:16px; }
+.attack-row { cursor:pointer; }
+.attack-row.open td { background:rgba(88,166,255,0.05); border-bottom-color:transparent; }
+.detail-row td { padding:0; background:var(--surface2); border-bottom:1px solid var(--border); }
+.detail-content { padding:16px 20px; display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap:16px; }
+.detail-content .full-width { grid-column: 1 / -1; }
+.detail-block { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:10px 12px; min-width:0; }
+.detail-block .detail-label { color:var(--muted); font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; font-weight:600; }
+.detail-block pre, .detail-block code { font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-size:0.78rem; line-height:1.45; color:var(--text); white-space:pre-wrap; word-break:break-word; max-height:340px; overflow:auto; }
+.detail-block.muted { background:transparent; border-style:dashed; color:var(--muted); }
+.indicator-pill { display:inline-block; background:rgba(248,81,73,0.12); color:var(--red); padding:2px 8px; border-radius:10px; font-size:0.72rem; margin-right:4px; margin-top:4px; }
+.indicator-pill.blocked { background:rgba(63,185,80,0.12); color:var(--green); }
+.copy-btn { float:right; background:transparent; border:1px solid var(--border); color:var(--muted); font-size:0.7rem; padding:2px 8px; border-radius:4px; cursor:pointer; margin-left:6px; }
+.copy-btn:hover { color:var(--accent); border-color:var(--accent); }
+.pager { display:flex; gap:8px; align-items:center; justify-content:center; margin:12px 0; flex-wrap:wrap; }
+.pager button { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.82rem; }
+.pager button:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.pager button:disabled { opacity:0.4; cursor:not-allowed; }
+.pager .page-info { color:var(--muted); font-size:0.82rem; }
+.pager select { background:var(--surface); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:4px; font-size:0.82rem; }
+.col-num { width:48px; }
+.col-mod { width:140px; }
+.col-cat { width:140px; }
+.col-status { width:90px; }
+.col-sev { width:90px; }
+.col-cvss { width:60px; }
+.col-conf { width:60px; }
+.col-owasp { width:170px; }
+.tab-row { display:flex; gap:4px; margin:4px 0 0; flex-wrap:wrap; }
+.tab-row button { background:var(--surface); border:1px solid var(--border); color:var(--muted); font-size:0.72rem; padding:3px 8px; border-radius:4px; cursor:pointer; }
+.tab-row button.active { background:var(--accent); color:var(--bg); border-color:var(--accent); }
+.empty { color:var(--muted); font-style:italic; padding:8px; }
+.tag { display:inline-block; background:var(--surface); border:1px solid var(--border); color:var(--muted); padding:1px 7px; border-radius:10px; font-size:0.7rem; margin-right:4px; }
+.tag.atlas { color:var(--purple); border-color:rgba(188,140,255,0.3); }
+.tag.cwe { color:var(--accent); border-color:rgba(88,166,255,0.3); }
 </style>
 </head>
 <body>
 <h1>Adversarial LLM Red Teaming Report</h1>
-<p class="subtitle">Generated: __TIMESTAMP__ &middot; Framework v__VERSION__</p>
+<p class="subtitle">Generated: __TIMESTAMP__ &middot; Framework v__VERSION__ &middot; Target: <strong style="color:var(--accent)">__MODEL_NAME__</strong> (__MODEL_PROVIDER__)</p>
+__MODEL_IDENTITY__
 <div class="grid">
   <div class="card"><div class="label">Total Attacks</div><div class="value blue">__TOTAL__</div></div>
   <div class="card"><div class="label">Successful</div><div class="value red">__SUCCESSFUL__</div></div>
@@ -65,62 +102,340 @@ tr:hover td { background:rgba(255,255,255,0.03); }
   <div class="card"><div class="label">Severity</div><div class="value" style="color:__SEV_COLOR__">__SEVERITY__</div></div>
   <div class="card"><div class="label">CVSS Range</div><div class="value purple">__CVSS_RANGE__</div></div>
 </div>
-<h2>Severity Distribution</h2><div class="severity-bar" id="sevBar"></div><div class="legend" id="sevLegend"></div>
+<h2>Severity Distribution</h2>
+<div class="severity-bar" id="sevBar"></div>
+<div class="legend" id="sevLegend"></div>
 __LLM_STATS__
-<h2>Module Breakdown</h2><table><thead><tr><th>Module</th><th>Total</th><th>Successful</th><th>Rate</th><th>Severity</th></tr></thead><tbody id="modTable"></tbody></table>
-<h2>Category Breakdown</h2><table><thead><tr><th>Category</th><th>Total</th><th>Successful</th><th>Blocked</th><th>Rate</th><th>Bar</th></tr></thead><tbody id="catTable"></tbody></table>
-<h2>OWASP LLM Top 10 Coverage</h2><table><thead><tr><th>Category</th><th>Tested</th><th>Successful</th><th>Rate</th><th>Max Severity</th><th>Avg CVSS</th><th>Modules</th></tr></thead><tbody id="owaspTable"></tbody></table>
+<h2>Module Breakdown</h2>
+<table><thead><tr><th>Module</th><th>Total</th><th>Successful</th><th>Rate</th><th>Severity</th></tr></thead><tbody id="modTable"></tbody></table>
+<h2>Category Breakdown</h2>
+<table><thead><tr><th>Category</th><th>Total</th><th>Successful</th><th>Blocked</th><th>Rate</th><th>Bar</th></tr></thead><tbody id="catTable"></tbody></table>
+<h2>OWASP LLM Top 10 Coverage</h2>
+<table><thead><tr><th>Category</th><th>Tested</th><th>Successful</th><th>Rate</th><th>Max Severity</th><th>Avg CVSS</th><th>Modules</th></tr></thead><tbody id="owaspTable"></tbody></table>
 <h2>Key Findings</h2><div id="findings"></div>
 <h2>Recommendations</h2><div id="recs"></div>
-<h2>All Attacks (__ATTACK_COUNT__)</h2>
-<div class="toolbar"><input type="text" id="searchInput" placeholder="Search patterns, categories, modules..."><select id="filterStatus"><option value="all">All</option><option value="success">Successful</option><option value="blocked">Blocked</option></select><select id="filterSev"><option value="all">All Severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="info">Info</option></select><select id="filterMod"><option value="all">All Modules</option></select></div>
-<table><thead><tr><th>#</th><th>Module</th><th>Category</th><th>Pattern</th><th>Status</th><th>Severity</th><th>CVSS</th><th>Conf.</th><th>OWASP</th></tr></thead><tbody id="attackTable"></tbody></table>
+<h2>Attack Catalogue (<span id="attackCount">__ATTACK_COUNT__</span>)</h2>
+<p class="subtitle">Click any row to expand the full attack vector, payload, model response, judge reasoning, and per-technique defensive guidance.</p>
+<div class="toolbar">
+  <input type="text" id="searchInput" placeholder="Search patterns, payloads, responses, modules, categories...">
+  <select id="filterStatus"><option value="all">All Status</option><option value="success">Successful</option><option value="blocked">Blocked</option></select>
+  <select id="filterSev"><option value="all">All Severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="info">Info</option></select>
+  <select id="filterMod"><option value="all">All Modules</option></select>
+  <select id="filterCat"><option value="all">All Categories</option></select>
+  <button id="expandAll">Expand visible</button>
+  <button id="collapseAll">Collapse all</button>
+</div>
+<table>
+  <thead><tr>
+    <th class="col-num">#</th>
+    <th class="col-mod">Module</th>
+    <th class="col-cat">Category</th>
+    <th>Pattern / Vector</th>
+    <th class="col-status">Status</th>
+    <th class="col-sev">Severity</th>
+    <th class="col-cvss">CVSS</th>
+    <th class="col-conf">Conf.</th>
+    <th class="col-owasp">OWASP</th>
+  </tr></thead>
+  <tbody id="attackTable"></tbody>
+</table>
+<div class="pager">
+  <button id="prevPage">&laquo; Prev</button>
+  <span class="page-info" id="pageInfo"></span>
+  <button id="nextPage">Next &raquo;</button>
+  <span class="page-info">Page size:</span>
+  <select id="pageSize"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="250">250</option><option value="9999">All</option></select>
+</div>
 <script>
-var attacks=__ATTACKS_JSON__;var catStats=__CAT_STATS_JSON__;var sevCounts=__SEV_COUNTS_JSON__;var modSummaries=__MOD_SUMMARIES_JSON__;var owaspData=__OWASP_JSON__;var findings=__FINDINGS_JSON__;var recs=__RECS_JSON__;
-var sevOrder=['critical','high','medium','low','info'];
-var sevColors={'critical':'#f85149','high':'#d29922','medium':'#e3b341','low':'#3fb950','info':'#8b949e'};
-var totalS=Object.values(sevCounts).reduce(function(a,b){return a+b},0)||1;
-sevOrder.forEach(function(s){var pct=(sevCounts[s]/totalS*100);if(pct>0){var d=document.createElement('div');d.style.width=pct+'%';d.style.background=sevColors[s];d.textContent=pct>12?sevCounts[s]:'';document.getElementById('sevBar').appendChild(d)}var sp=document.createElement('span');sp.innerHTML='<span class="dot" style="background:'+sevColors[s]+'"></span> '+s+': '+sevCounts[s];document.getElementById('sevLegend').appendChild(sp)});
-var calcSev=function(s,t){return t===0?'unknown':s/t>=0.5?'critical':s/t>=0.3?'high':s/t>=0.1?'medium':'low'};
-Object.entries(modSummaries).forEach(function(e){var m=e[0],d=e[1],sv=calcSev(d.successful,d.total);document.getElementById('modTable').innerHTML+='<tr><td>'+m+'</td><td>'+d.total+'</td><td>'+d.successful+'</td><td>'+d.success_rate.toFixed(1)+'%</td><td><span class="badge '+sv+'">'+sv.toUpperCase()+'</span></td></tr>'});
-Object.entries(catStats).sort(function(a,b){return(b[1].success/b[1].total)-(a[1].success/a[1].total)}).forEach(function(e){var c=e[0],d=e[1],rate=(d.success/d.total*100).toFixed(1),bc=d.success/d.total>=0.5?'#f85149':d.success/d.total>=0.2?'#d29922':'#3fb950';document.getElementById('catTable').innerHTML+='<tr><td>'+c+'</td><td>'+d.total+'</td><td>'+d.success+'</td><td>'+d.blocked+'</td><td>'+rate+'%</td><td><div class="bar-bg"><div class="bar-fill" style="width:'+rate+'%;background:'+bc+'"></div></div></td></tr>'});
-Object.entries(owaspData).forEach(function(e){var k=e[0],v=e[1];document.getElementById('owaspTable').innerHTML+='<tr><td>'+k+'</td><td>'+v.total_tested+'</td><td>'+v.successful+'</td><td>'+v.success_rate.toFixed(1)+'%</td><td><span class="badge '+v.max_severity+'">'+v.max_severity.toUpperCase()+'</span></td><td>'+v.avg_cvss+'</td><td>'+v.modules.join(', ')+'</td></tr>'});
-findings.forEach(function(f){document.getElementById('findings').innerHTML+='<div class="finding-item"><div class="finding-info"><strong>'+f.module+'</strong> &middot; '+f.successful+'/'+f.total_attacks+' attacks<br><span style="color:var(--muted);font-size:0.8rem">'+f.severity.toUpperCase()+' severity</span></div><div class="finding-rate" style="color:'+(sevColors[f.severity]||'var(--text)')+'">'+f.success_rate.toFixed(1)+'%</div></div>'});
-recs.forEach(function(r){if(typeof r==='object'&&r.recommendation){var h='<div class="rec-item"><div class="rec-title">['+(r.owasp||'General')+']<span class="badge '+(r.severity||'info')+'" style="margin-left:8px">'+(r.severity||'info').toUpperCase()+'</span></div><div style="margin-bottom:6px">'+r.recommendation+'</div><ul>';(r.actions||[]).forEach(function(a){h+='<li>'+a+'</li>'});document.getElementById('recs').innerHTML+=h+'</ul></div>'}});
-var mods=[...new Set(attacks.map(function(a){return a.module}))];
-document.getElementById('filterMod').innerHTML='<option value="all">All Modules</option>'+mods.map(function(m){return '<option value="'+m+'">'+m+'</option>'}).join('');
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function renderTable(data){var tb=document.getElementById('attackTable');tb.innerHTML='';data.forEach(function(a,i){var st=a.success?'success':'blocked',cf=a.confidence!=null?a.confidence.toFixed(2):'N/A',pe=esc(a.pattern),re=esc(a.response||''),ih=(a.indicators||[]).map(function(ind){return'<div>&#8212; '+esc(ind)+'</div>'}).join('');tb.innerHTML+='<tr><td>'+(i+1)+'</td><td>'+esc(a.module)+'</td><td>'+esc(a.category)+'</td><td><div class="collapsible" onclick="this.classList.toggle(\'open\')">'+pe+'</div><div class="collapsible-body"><div><strong>Status:</strong> '+(a.success?'SUCCESS':'BLOCKED')+'</div><div><strong>Response:</strong> '+re+'</div>'+(ih?'<div><strong>Indicators:</strong>'+ih+'</div>':'')+'</div></td><td><span class="badge '+st+'">'+(a.success?'SUCCESS':'BLOCKED')+'</span></td><td><span class="badge '+a.severity+'">'+a.severity.toUpperCase()+'</span></td><td>'+a.cvss.toFixed(1)+'</td><td>'+cf+'</td><td>'+esc(a.owasp)+'</td></tr>'})}
-function applyFilters(){var q=document.getElementById('searchInput').value.toLowerCase(),fs=document.getElementById('filterStatus').value,fsv=document.getElementById('filterSev').value,fm=document.getElementById('filterMod').value;var filtered=attacks.filter(function(a){if(q){var s=(a.module+' '+a.category+' '+a.pattern+' '+a.owasp).toLowerCase();if(s.indexOf(q)===-1)return false}if(fs==='success'&&!a.success)return false;if(fs==='blocked'&&a.success)return false;if(fsv!=='all'&&a.severity!==fsv)return false;if(fm!=='all'&&a.module!==fm)return false;return true});renderTable(filtered)}
-document.getElementById('searchInput').addEventListener('input',applyFilters);
-document.getElementById('filterStatus').addEventListener('change',applyFilters);
-document.getElementById('filterSev').addEventListener('change',applyFilters);
-document.getElementById('filterMod').addEventListener('change',applyFilters);
-renderTable(attacks);
-</script>
-</body>
-</html>
+var attacks = __ATTACKS_JSON__;
+var catStats = __CAT_STATS_JSON__;
+var sevCounts = __SEV_COUNTS_JSON__;
+var modSummaries = __MOD_SUMMARIES_JSON__;
+var owaspData = __OWASP_JSON__;
+var findings = __FINDINGS_JSON__;
+var recs = __RECS_JSON__;
+var techniqueInfo = __TECHNIQUE_INFO_JSON__;
 
-var sevOrder=['critical','high','medium','low','info'];
-var sevColors={'critical':'#f85149','high':'#d29922','medium':'#e3b341','low':'#3fb950','info':'#8b949e'};
-var totalS=Object.values(sevCounts).reduce(function(a,b){return a+b},0)||1;
-sevOrder.forEach(function(s){var pct=(sevCounts[s]/totalS*100);if(pct>0){var d=document.createElement('div');d.style.width=pct+'%';d.style.background=sevColors[s];d.textContent=pct>12?sevCounts[s]:'';document.getElementById('sevBar').appendChild(d)}var sp=document.createElement('span');sp.innerHTML='<span class="dot" style="background:'+sevColors[s]+'"></span> '+s+': '+sevCounts[s];document.getElementById('sevLegend').appendChild(sp)});
-var calcSev=function(s,t){return t===0?'unknown':s/t>=0.5?'critical':s/t>=0.3?'high':s/t>=0.1?'medium':'low'};
-Object.entries(modSummaries).forEach(function(e){var m=e[0],d=e[1],sv=calcSev(d.successful,d.total);document.getElementById('modTable').innerHTML+='<tr><td>'+m+'</td><td>'+d.total+'</td><td>'+d.successful+'</td><td>'+d.success_rate.toFixed(1)+'%</td><td><span class="badge '+sv+'">'+sv.toUpperCase()+'</span></td></tr>'});
-Object.entries(catStats).sort(function(a,b){return(b[1].success/b[1].total)-(a[1].success/a[1].total)}).forEach(function(e){var c=e[0],d=e[1],rate=(d.success/d.total*100).toFixed(1),bc=d.success/d.total>=0.5?'#f85149':d.success/d.total>=0.2?'#d29922':'#3fb950';document.getElementById('catTable').innerHTML+='<tr><td>'+c+'</td><td>'+d.total+'</td><td>'+d.success+'</td><td>'+d.blocked+'</td><td>'+rate+'%</td><td><div class="bar-bg"><div class="bar-fill" style="width:'+rate+'%;background:'+bc+'"></div></div></td></tr>'});
-Object.entries(owaspData).forEach(function(e){var k=e[0],v=e[1];document.getElementById('owaspTable').innerHTML+='<tr><td>'+k+'</td><td>'+v.total_tested+'</td><td>'+v.successful+'</td><td>'+v.success_rate.toFixed(1)+'%</td><td><span class="badge '+v.max_severity+'">'+v.max_severity.toUpperCase()+'</span></td><td>'+v.avg_cvss+'</td><td>'+v.modules.join(', ')+'</td></tr>'});
-findings.forEach(function(f){document.getElementById('findings').innerHTML+='<div class="finding-item"><div class="finding-info"><strong>'+f.module+'</strong> &middot; '+f.successful+'/'+f.total_attacks+' attacks<br><span style="color:var(--muted);font-size:0.8rem">'+f.severity.toUpperCase()+' severity</span></div><div class="finding-rate" style="color:'+(sevColors[f.severity]||'var(--text)')+'">'+f.success_rate.toFixed(1)+'%</div></div>'});
-recs.forEach(function(r){if(typeof r==='object'&&r.recommendation){var h='<div class="rec-item"><div class="rec-title">['+(r.owasp||'General')+']<span class="badge '+(r.severity||'info')+'" style="margin-left:8px">'+(r.severity||'info').toUpperCase()+'</span></div><div style="margin-bottom:6px">'+r.recommendation+'</div><ul>';if(Array.isArray(r.actions))r.actions.forEach(function(a){h+='<li>'+a+'</li>'});document.getElementById('recs').innerHTML+=h+'</ul></div>'}});
-var mods=[...new Set(attacks.map(function(a){return a.module}))];
-document.getElementById('filterMod').innerHTML='<option value="all">All Modules</option>'+mods.map(function(m){return '<option value="'+m+'">'+m+'</option>'}).join('');
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function renderTable(data){var tb=document.getElementById('attackTable');tb.innerHTML='';data.forEach(function(a,i){var st=a.success?'success':'blocked',cf=a.confidence!=null?a.confidence.toFixed(2):'N/A',pe=esc(a.pattern),re=esc(a.response||''),ih=(a.indicators||[]).map(function(ind){return'<div>&#8212; '+esc(ind)+'</div>'}).join('');tb.innerHTML+='<tr><td>'+(i+1)+'</td><td>'+esc(a.module)+'</td><td>'+esc(a.category)+'</td><td><div class="collapsible" onclick="this.classList.toggle(\'open\')">'+pe+'</div><div class="collapsible-body"><div><strong>Status:</strong> '+(a.success?'SUCCESS':'BLOCKED')+'</div><div><strong>Response:</strong> '+re+'</div>'+(ih?'<div><strong>Indicators:</strong>'+ih+'</div>':'')+'</div></td><td><span class="badge '+st+'">'+(a.success?'SUCCESS':'BLOCKED')+'</span></td><td><span class="badge '+a.severity+'">'+a.severity.toUpperCase()+'</span></td><td>'+a.cvss.toFixed(1)+'</td><td>'+cf+'</td><td>'+esc(a.owasp)+'</td></tr>'})}
-function applyFilters(){var q=document.getElementById('searchInput').value.toLowerCase(),fs=document.getElementById('filterStatus').value,fsv=document.getElementById('filterSev').value,fm=document.getElementById('filterMod').value;var filtered=attacks.filter(function(a){if(q){var s=(a.module+' '+a.category+' '+a.pattern+' '+a.owasp).toLowerCase();if(s.indexOf(q)===-1)return false}if(fs==='success'&&!a.success)return false;if(fs==='blocked'&&a.success)return false;if(fsv!=='all'&&a.severity!==fsv)return false;if(fm!=='all'&&a.module!==fm)return false;return true});renderTable(filtered)}
-document.getElementById('searchInput').addEventListener('input',applyFilters);
-document.getElementById('filterStatus').addEventListener('change',applyFilters);
-document.getElementById('filterSev').addEventListener('change',applyFilters);
-document.getElementById('filterMod').addEventListener('change',applyFilters);
-renderTable(attacks);
+var sevOrder = ['critical','high','medium','low','info'];
+var sevColors = {'critical':'#f85149','high':'#d29922','medium':'#e3b341','low':'#3fb950','info':'#8b949e'};
+
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function calcSev(s, t) {
+  if (t === 0) return 'unknown';
+  var r = s / t;
+  return r >= 0.5 ? 'critical' : r >= 0.3 ? 'high' : r >= 0.1 ? 'medium' : 'low';
+}
+
+// Severity bar
+(function() {
+  var totalS = Object.values(sevCounts).reduce(function(a,b){return a+b;},0) || 1;
+  var bar = document.getElementById('sevBar');
+  var legend = document.getElementById('sevLegend');
+  sevOrder.forEach(function(s) {
+    var c = sevCounts[s] || 0;
+    var pct = c / totalS * 100;
+    if (pct > 0) {
+      var d = document.createElement('div');
+      d.style.width = pct + '%';
+      d.style.background = sevColors[s];
+      d.textContent = pct > 12 ? c : '';
+      bar.appendChild(d);
+    }
+    var sp = document.createElement('span');
+    sp.innerHTML = '<span class="dot" style="background:' + sevColors[s] + '"></span> ' + s + ': ' + c;
+    legend.appendChild(sp);
+  });
+})();
+
+// Module table
+(function() {
+  var rows = [];
+  Object.entries(modSummaries).forEach(function(e) {
+    var m = e[0], d = e[1], sv = calcSev(d.successful, d.total);
+    rows.push('<tr><td>' + esc(m) + '</td><td>' + d.total + '</td><td>' + d.successful + '</td><td>' + d.success_rate.toFixed(1) + '%</td><td><span class="badge ' + sv + '">' + sv.toUpperCase() + '</span></td></tr>');
+  });
+  document.getElementById('modTable').innerHTML = rows.join('');
+})();
+
+// Category table
+(function() {
+  var rows = [];
+  Object.entries(catStats).sort(function(a,b){
+    return (b[1].success / Math.max(b[1].total,1)) - (a[1].success / Math.max(a[1].total,1));
+  }).forEach(function(e) {
+    var c = e[0], d = e[1];
+    var rate = d.total > 0 ? (d.success / d.total * 100) : 0;
+    var bc = rate >= 50 ? '#f85149' : rate >= 20 ? '#d29922' : '#3fb950';
+    rows.push('<tr><td>' + esc(c) + '</td><td>' + d.total + '</td><td>' + d.success + '</td><td>' + d.blocked + '</td><td>' + rate.toFixed(1) + '%</td><td><div class="bar-bg"><div class="bar-fill" style="width:' + rate.toFixed(1) + '%;background:' + bc + '"></div></div></td></tr>');
+  });
+  document.getElementById('catTable').innerHTML = rows.join('');
+})();
+
+// OWASP table
+(function() {
+  var rows = [];
+  Object.entries(owaspData).forEach(function(e) {
+    var k = e[0], v = e[1];
+    rows.push('<tr><td>' + esc(k) + '</td><td>' + v.total_tested + '</td><td>' + v.successful + '</td><td>' + v.success_rate.toFixed(1) + '%</td><td><span class="badge ' + v.max_severity + '">' + v.max_severity.toUpperCase() + '</span></td><td>' + v.avg_cvss + '</td><td>' + esc((v.modules || []).join(', ')) + '</td></tr>');
+  });
+  document.getElementById('owaspTable').innerHTML = rows.join('');
+})();
+
+// Findings
+(function() {
+  var rows = [];
+  findings.forEach(function(f) {
+    rows.push('<div class="finding-item"><div class="finding-info"><strong>' + esc(f.module) + '</strong> &middot; ' + f.successful_attacks + '/' + f.total_attacks + ' attacks<br><span style="color:var(--muted);font-size:0.8rem">' + (f.severity || 'info').toUpperCase() + ' severity</span></div><div class="finding-rate" style="color:' + (sevColors[f.severity] || 'var(--text)') + '">' + f.success_rate.toFixed(1) + '%</div></div>');
+  });
+  document.getElementById('findings').innerHTML = rows.join('');
+})();
+
+// Recommendations
+(function() {
+  var rows = [];
+  recs.forEach(function(r) {
+    if (typeof r === 'object' && r.recommendation) {
+      var html = '<div class="rec-item"><div class="rec-title">[' + esc(r.owasp || 'General') + '] <span class="badge ' + (r.severity || 'info') + '" style="margin-left:4px">' + (r.severity || 'info').toUpperCase() + '</span></div><div style="margin-bottom:6px">' + esc(r.recommendation) + '</div><ul>';
+      (r.actions || []).forEach(function(a) { html += '<li>' + esc(a) + '</li>'; });
+      html += '</ul></div>';
+      rows.push(html);
+    }
+  });
+  document.getElementById('recs').innerHTML = rows.join('');
+})();
+
+// Filter dropdowns
+(function() {
+  var mods = Array.from(new Set(attacks.map(function(a){return a.module;}))).sort();
+  document.getElementById('filterMod').innerHTML = '<option value="all">All Modules</option>' + mods.map(function(m){return '<option value="' + esc(m) + '">' + esc(m) + '</option>';}).join('');
+  var cats = Array.from(new Set(attacks.map(function(a){return a.category;}))).sort();
+  document.getElementById('filterCat').innerHTML = '<option value="all">All Categories</option>' + cats.map(function(c){return '<option value="' + esc(c) + '">' + esc(c) + '</option>';}).join('');
+})();
+
+// Attack table with pagination + lazy detail rendering
+var pageSize = 50;
+var currentPage = 1;
+var filtered = attacks.slice();
+var openRows = {};
+
+function buildDetailHtml(a, idx) {
+  var info = techniqueInfo[a.category] || techniqueInfo[a.module] || {};
+  var indicators = (a.indicators || []).map(function(ind) {
+    return '<span class="indicator-pill ' + (a.success ? '' : 'blocked') + '">' + esc(ind) + '</span>';
+  }).join('');
+  var atlas = info.atlas ? '<span class="tag atlas">MITRE ATLAS: ' + esc(info.atlas) + '</span>' : '';
+  var cwe = info.cwe ? '<span class="tag cwe">CWE: ' + esc(info.cwe) + '</span>' : '';
+  var owaspTag = a.owasp ? '<span class="tag">' + esc(a.owasp) + '</span>' : '';
+
+  var prompt = a.prompt || a.pattern || '';
+  var goal = a.goal || a.malicious_goal || '';
+  var response = a.response || '';
+  var judge = a.judge_reasoning || '';
+  var refs = info.references || [];
+  var defense = info.defense || [];
+  var description = info.description || '';
+
+  var refsHtml = refs.length
+    ? '<ul style="margin-left:18px;font-size:0.8rem">' + refs.map(function(r){return '<li><a href="' + esc(r.url) + '" target="_blank" style="color:var(--accent)">' + esc(r.title) + '</a></li>';}).join('') + '</ul>'
+    : '<div class="empty">No external references registered for this technique.</div>';
+
+  var defenseHtml = defense.length
+    ? '<ul style="margin-left:18px;font-size:0.8rem">' + defense.map(function(d){return '<li>' + esc(d) + '</li>';}).join('') + '</ul>'
+    : '<div class="empty">No specific defensive guidance registered for this technique.</div>';
+
+  var cells = [];
+
+  cells.push('<div class="detail-block full-width"><div class="detail-label">Technique &middot; ' + esc(a.category) + ' (' + esc(a.module) + ') ' + atlas + ' ' + cwe + ' ' + owaspTag + '</div>' +
+             (description ? '<div style="font-size:0.82rem;color:var(--text);margin-top:4px">' + esc(description) + '</div>' : '<div class="empty">No technique description registered.</div>') + '</div>');
+
+  cells.push('<div class="detail-block"><div class="detail-label">Attack Vector / Payload <button class="copy-btn" data-copy="d-prompt-' + idx + '">copy</button></div><pre id="d-prompt-' + idx + '">' + esc(prompt) + '</pre></div>');
+
+  cells.push('<div class="detail-block"><div class="detail-label">Malicious Goal</div><pre>' + esc(goal || '(no explicit goal)') + '</pre></div>');
+
+  cells.push('<div class="detail-block full-width"><div class="detail-label">Model Response <button class="copy-btn" data-copy="d-resp-' + idx + '">copy</button></div><pre id="d-resp-' + idx + '">' + esc(response || '(no response captured)') + '</pre></div>');
+
+  if (judge) {
+    cells.push('<div class="detail-block full-width"><div class="detail-label">LLM-as-Judge Reasoning</div><pre>' + esc(judge) + '</pre></div>');
+  }
+
+  cells.push('<div class="detail-block"><div class="detail-label">Detection Indicators</div>' + (indicators || '<div class="empty">No indicators recorded.</div>') + '</div>');
+
+  cells.push('<div class="detail-block"><div class="detail-label">Scoring</div>' +
+             '<div>Status: <span class="badge ' + (a.success ? 'success' : 'blocked') + '">' + (a.success ? 'SUCCESS' : 'BLOCKED') + '</span></div>' +
+             '<div style="margin-top:4px">Severity: <span class="badge ' + a.severity + '">' + (a.severity || 'info').toUpperCase() + '</span></div>' +
+             '<div style="margin-top:4px">CVSS: ' + a.cvss.toFixed(1) + '</div>' +
+             '<div style="margin-top:4px">Confidence: ' + (a.confidence != null ? a.confidence.toFixed(2) : 'N/A') + '</div>' +
+             '</div>');
+
+  cells.push('<div class="detail-block"><div class="detail-label">Defensive Guidance (Blue Team)</div>' + defenseHtml + '</div>');
+
+  cells.push('<div class="detail-block"><div class="detail-label">References</div>' + refsHtml + '</div>');
+
+  return '<div class="detail-content">' + cells.join('') + '</div>';
+}
+
+function renderAttackRow(a, globalIdx) {
+  var st = a.success ? 'success' : 'blocked';
+  var cf = a.confidence != null ? a.confidence.toFixed(2) : 'N/A';
+  var pat = (a.pattern || '').slice(0, 220);
+  return '<tr class="attack-row" data-idx="' + globalIdx + '">' +
+         '<td class="col-num">' + (globalIdx + 1) + '</td>' +
+         '<td class="col-mod">' + esc(a.module) + '</td>' +
+         '<td class="col-cat">' + esc(a.category) + '</td>' +
+         '<td><div style="font-family:ui-monospace,Menlo,monospace;font-size:0.78rem;white-space:pre-wrap;word-break:break-word">' + esc(pat) + '</div></td>' +
+         '<td class="col-status"><span class="badge ' + st + '">' + (a.success ? 'SUCCESS' : 'BLOCKED') + '</span></td>' +
+         '<td class="col-sev"><span class="badge ' + a.severity + '">' + (a.severity || 'info').toUpperCase() + '</span></td>' +
+         '<td class="col-cvss">' + a.cvss.toFixed(1) + '</td>' +
+         '<td class="col-conf">' + cf + '</td>' +
+         '<td class="col-owasp">' + esc(a.owasp || 'N/A') + '</td>' +
+         '</tr>';
+}
+
+function renderTablePage() {
+  var tb = document.getElementById('attackTable');
+  var total = filtered.length;
+  var pages = Math.max(1, Math.ceil(total / pageSize));
+  if (currentPage > pages) currentPage = pages;
+  var start = (currentPage - 1) * pageSize;
+  var end = Math.min(start + pageSize, total);
+  var slice = filtered.slice(start, end);
+
+  // Build via fragment for performance with hundreds of rows
+  var html = [];
+  for (var i = 0; i < slice.length; i++) {
+    var a = slice[i];
+    var globalIdx = a._idx;
+    html.push(renderAttackRow(a, globalIdx));
+    if (openRows[globalIdx]) {
+      html.push('<tr class="detail-row" data-detail-for="' + globalIdx + '"><td colspan="9">' + buildDetailHtml(a, globalIdx) + '</td></tr>');
+    }
+  }
+  tb.innerHTML = html.join('');
+
+  document.getElementById('pageInfo').textContent = total === 0
+    ? '0 of 0'
+    : (start + 1) + '–' + end + ' of ' + total + ' (page ' + currentPage + '/' + pages + ')';
+  document.getElementById('prevPage').disabled = currentPage <= 1;
+  document.getElementById('nextPage').disabled = currentPage >= pages;
+  document.getElementById('attackCount').textContent = attacks.length + (total !== attacks.length ? ' / showing ' + total : '');
+}
+
+function applyFilters() {
+  var q = document.getElementById('searchInput').value.toLowerCase().trim();
+  var fs = document.getElementById('filterStatus').value;
+  var fsv = document.getElementById('filterSev').value;
+  var fm = document.getElementById('filterMod').value;
+  var fc = document.getElementById('filterCat').value;
+  filtered = attacks.filter(function(a) {
+    if (q) {
+      var s = (a.module + ' ' + a.category + ' ' + (a.pattern || '') + ' ' + (a.prompt || '') + ' ' + (a.response || '') + ' ' + (a.owasp || '')).toLowerCase();
+      if (s.indexOf(q) === -1) return false;
+    }
+    if (fs === 'success' && !a.success) return false;
+    if (fs === 'blocked' && a.success) return false;
+    if (fsv !== 'all' && a.severity !== fsv) return false;
+    if (fm !== 'all' && a.module !== fm) return false;
+    if (fc !== 'all' && a.category !== fc) return false;
+    return true;
+  });
+  currentPage = 1;
+  renderTablePage();
+}
+
+// Stamp a stable index on each attack (for open-row tracking across filter changes)
+attacks.forEach(function(a, i) { a._idx = i; });
+filtered = attacks.slice();
+
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+document.getElementById('filterStatus').addEventListener('change', applyFilters);
+document.getElementById('filterSev').addEventListener('change', applyFilters);
+document.getElementById('filterMod').addEventListener('change', applyFilters);
+document.getElementById('filterCat').addEventListener('change', applyFilters);
+document.getElementById('pageSize').addEventListener('change', function(e) {
+  pageSize = parseInt(e.target.value, 10) || 50;
+  currentPage = 1;
+  renderTablePage();
+});
+document.getElementById('prevPage').addEventListener('click', function() {
+  if (currentPage > 1) { currentPage--; renderTablePage(); }
+});
+document.getElementById('nextPage').addEventListener('click', function() {
+  var pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  if (currentPage < pages) { currentPage++; renderTablePage(); }
+});
+document.getElementById('expandAll').addEventListener('click', function() {
+  var start = (currentPage - 1) * pageSize;
+  var end = Math.min(start + pageSize, filtered.length);
+  for (var i = start; i < end; i++) openRows[filtered[i]._idx] = true;
+  renderTablePage();
+});
+document.getElementById('collapseAll').addEventListener('click', function() {
+  openRows = {};
+  renderTablePage();
+});
+
+// Row click toggles detail
+document.getElementById('attackTable').addEventListener('click', function(ev) {
+  var copy = ev.target.closest && ev.target.closest('[data-copy]');
+  if (copy) {
+    var el = document.getElementById(copy.getAttribute('data-copy'));
+    if (el) {
+      navigator.clipboard && navigator.clipboard.writeText(el.textContent || '').then(function() {
+        var orig = copy.textContent; copy.textContent = 'copied'; setTimeout(function(){ copy.textContent = orig; }, 1200);
+      });
+    }
+    ev.stopPropagation();
+    return;
+  }
+  var row = ev.target.closest && ev.target.closest('tr.attack-row');
+  if (!row) return;
+  var idx = parseInt(row.getAttribute('data-idx'), 10);
+  openRows[idx] = !openRows[idx];
+  renderTablePage();
+});
+
+renderTablePage();
 </script>
 </body>
 </html>

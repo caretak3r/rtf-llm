@@ -2,7 +2,7 @@
   "llm": {
     "provider": "custom",
     "api_key": "not-needed",
-    "model": "Qwen3.6-27B-UD-Q4_K_XL.gguf",
+    "model": "BugTraceAI-Apex-G4-26B-Q4.gguf",
     "base_url": "http://localhost:8080/v1",
     "temperature": 0.7,
     "max_tokens": 2000,
@@ -71,7 +71,7 @@
     },
     "custom": {
       "api_key": "not-needed",
-      "default_model": "Qwen3.6-27B-UD-Q4_K_XL.gguf",
+      "default_model": "BugTraceAI-Apex-G4-26B-Q4.gguf",
       "base_url": "http://localhost:8080/v1"
     }
   },
@@ -140,7 +140,7 @@
   },
   "reporting": {
     "output_dir": "reports",
-    "format": "json",
+    "format": "html",
     "include_responses": true,
     "severity_threshold": "medium",
     "detailed_analysis": true,

@@ -113,9 +113,18 @@ Edit `config.json`:
 
 ### Custom LLM Provider
 
-For custom/OpenAI-compatible APIs:
+For custom/OpenAI-compatible APIs (e.g., llama.cpp server, LM Studio, vLLM):
 
 ```bash
+# Local model with no auth, judge enabled (recommended for local sweeps)
+PYTHONUNBUFFERED=1 .venv/bin/python3 main.py --module all \
+  --no-auth --judge --judge-mode both \
+  --provider custom \
+  --target http://localhost:8080/v1 \
+  --model your-model \
+  --intensity high --verbose
+
+# Or with API key
 python main.py --module all \
   --api-key YOUR_KEY \
   --provider custom \

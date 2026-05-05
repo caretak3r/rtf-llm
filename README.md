@@ -24,11 +24,19 @@ uv sync
 ## Quick Start
 
 ```bash
-# run one attack module
+# run one attack module (cloud provider)
 uv run python main.py --module prompt-injection --provider openai --model gpt-4o --api-key "$OPENAI_API_KEY"
 
-# run full sweep with judge enabled
+# run full sweep with judge enabled (cloud provider)
 uv run python main.py --module all --judge --judge-mode both --provider openai --model gpt-4o --api-key "$OPENAI_API_KEY"
+
+# run full sweep against a local model (no auth, judge enabled)
+PYTHONUNBUFFERED=1 .venv/bin/python3 main.py --module all \
+  --no-auth --judge --judge-mode both \
+  --provider custom \
+  --target http://localhost:8080/v1 \
+  --model <model-name> \
+  --intensity high --verbose
 
 # force HTML primary report
 uv run python main.py --module all --report-format html --provider openai --model gpt-4o --api-key "$OPENAI_API_KEY"
@@ -36,6 +44,8 @@ uv run python main.py --module all --report-format html --provider openai --mode
 # compare configured targets from config.json
 uv run python main.py --module comparison --comparison
 ```
+
+> **Note:** For long-running local model sweeps, use `PYTHONUNBUFFERED=1` with the venv python directly instead of `uv run` to ensure real-time log output. The `--no-auth` flag skips the authorization prompt for automated runs.
 
 ## Attack & Exercise Docs
 

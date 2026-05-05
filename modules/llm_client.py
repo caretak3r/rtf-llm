@@ -178,8 +178,60 @@ class LLMClient:
     def _parse_openai_response(self, response):
         data = response.json()
         if "choices" in data and len(data["choices"]) > 0:
-            return data["choices"][0].get("message", {}).get("content", "")
+            msg = data["choices"][0].get("message", {})
+            content = msg.get("content", "")
+            # Handle thinking/reasoning models where content may be empty
+            # but reasoning_content holds the actual thinking
+            reasoning = msg.get("reasoning_content", "")
+            if not content and reasoning:
+                content = reasoning
+            if not content:
+                # Try tool_calls or function_call as fallback
+                tc = msg.get("tool_calls")
+                if tc:
+                    content = str(tc)
+            return content
         raise ValueError(f"Unexpected response format: {json.dumps(data, indent=2)}")
+
+    def chat_raw(self, messages, **kwargs):
+        """Like chat() but returns the raw API response JSON for metadata extraction."""
+        if self.provider == "ollama":
+            payload = self._format_ollama_request(messages, **kwargs)
+        elif self.provider == "anthropic":
+            payload = self._format_anthropic_request(messages, **kwargs)
+        elif self.provider == "google":
+            payload = self._format_google_request(messages, **kwargs)
+        elif self.provider == "cohere":
+            payload = self._format_cohere_request(messages, **kwargs)
+        else:
+            payload = self._format_openai_request(messages, **kwargs)
+        headers = self._get_headers()
+        url = self.chat_url.replace("{model}", self.model) if self.provider == "google" else self.chat_url
+        return self._request_raw(url, headers, payload)
+
+    def _request_raw(self, url, headers, payload, attempt=0):
+        """Make a request and return the raw JSON response dict."""
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=self.timeout)
+            self.request_count += 1
+            if response.status_code == 429 and attempt < self.max_retries:
+                retry_after = float(response.headers.get("Retry-After", self.retry_base_delay))
+                wait = min(retry_after + random.uniform(0, 1), self.retry_max_delay)
+                time.sleep(wait)
+                return self._request_raw(url, headers, payload, attempt + 1)
+            if response.status_code >= 500 and attempt < self.max_retries:
+                wait = min(self.retry_base_delay * (2 ** attempt) + random.uniform(0, 1), self.retry_max_delay)
+                time.sleep(wait)
+                return self._request_raw(url, headers, payload, attempt + 1)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            self.error_count += 1
+            if attempt < self.max_retries:
+                wait = min(self.retry_base_delay * (2 ** attempt), self.retry_max_delay)
+                time.sleep(wait)
+                return self._request_raw(url, headers, payload, attempt + 1)
+            raise
 
     def _parse_ollama_response(self, response):
         data = response.json()
@@ -282,3 +334,117 @@ class LLMClient:
         except Exception as e:
             print(f"{Fore.RED}[!] Connection test failed: {e}{Style.RESET_ALL}")
             return False
+
+    def identify_model(self) -> Dict[str, Any]:
+        """Probe the model to discover its true identity.
+
+        Uses two approaches:
+          1. Direct API response metadata (the 'model' field in the response JSON)
+          2. Prompting the model to self-identify
+
+        The identified name may differ from the configured model name.
+        """
+        identity = {
+            "configured_name": self.model,
+            "configured_provider": self.provider,
+            "identified_name": None,
+            "identified_provider": None,
+            "raw_responses": [],
+        }
+
+        known_models = {
+            "gpt": "openai", "chatgpt": "openai", "o1": "openai", "o3": "openai", "o4": "openai",
+            "claude": "anthropic", "anthropic": "anthropic",
+            "gemini": "google", "bard": "google",
+            "llama": "meta", "codellama": "meta",
+            "mistral": "mistral", "mixtral": "mistral",
+            "command": "cohere", "cohere": "cohere",
+            "qwen": "alibaba", "qwq": "alibaba",
+            "deepseek": "deepseek",
+            "phi": "microsoft",
+            "granite": "ibm",
+            "falcon": "tii",
+            "starcoder": "bigcode",
+            "solar": "upstage",
+            "yi": "01ai",
+            "jamba": "ai21",
+            "grok": "xai",
+            "dbrx": "databricks",
+            "hermes": "nousresearch", "nous": "nousresearch",
+            "dolphin": "cognitivecomputations",
+            "bugtrace": "custom",
+        }
+
+        # Approach 1: Extract model name from raw API response metadata
+        try:
+            raw = self.chat_raw([{"role": "user", "content": "Hello"}],
+                                max_tokens=5, temperature=0.1)
+            if isinstance(raw, dict):
+                api_model = raw.get("model", "")
+                if api_model:
+                    identity["identified_name"] = api_model
+                    for model_key, provider in known_models.items():
+                        if model_key in api_model.lower():
+                            identity["identified_provider"] = provider
+                            break
+        except Exception:
+            pass
+
+        # Approach 2: Prompt the model to self-identify
+        probes = [
+            ("What is your exact model name and version? Respond with just the model identifier.",
+             "direct"),
+            ("Who created you? What is your model identifier? Respond concisely.",
+             "creator"),
+        ]
+
+        for prompt, probe_type in probes:
+            try:
+                response = self.generate(prompt, max_tokens=200, temperature=0.3)
+                identity["raw_responses"].append({
+                    "probe": probe_type,
+                    "response": response,
+                })
+
+                text = response.lower()
+                if not identity["identified_name"]:
+                    for model_key, provider in known_models.items():
+                        if model_key in text:
+                            identity["identified_name"] = self._extract_model_name(response)
+                            if not identity["identified_provider"]:
+                                identity["identified_provider"] = provider
+                            break
+
+            except Exception:
+                continue
+
+        if not identity["identified_name"] and identity["raw_responses"]:
+            identity["identified_name"] = self._extract_model_name(
+                identity["raw_responses"][0]["response"]
+            )
+
+        if not identity["identified_name"]:
+            identity["identified_name"] = self.model
+
+        if not identity["identified_provider"]:
+            identity["identified_provider"] = self.provider
+
+        return identity
+
+    def _extract_model_name(self, text: str) -> str:
+        """Extract a model name from the model's own response."""
+        import re
+        # Common patterns models use to identify themselves
+        patterns = [
+            r'(?:I am|I\'m|My name is|I\'m called|Model[:\s]*)\s*[`"\']?([A-Za-z0-9][\w\-\.]+\d[\w\-\.]*)',
+            r'([A-Z][\w\-]*[\d]+[\w\-]*)',  # e.g., GPT-4o, Claude-3, Qwen3.6
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                return match.group(1)
+        # Fallback: first capitalized word sequence
+        match = re.search(r'([A-Z][a-zA-Z0-9]*(?:[\-\.][A-Za-z0-9]+)*)', text)
+        if match:
+            return match.group(1)
+        return self.model

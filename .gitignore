@@ -247,3 +247,4 @@ tags
 modules/__pycache__*
 opencode.json
 reports/
+nohup.out
