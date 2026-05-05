@@ -630,4 +630,476 @@ TECHNIQUE_INFO = {
         ],
         "references": [],
     },
+
+    # ================================================================
+    # 2025-2026 Cutting-Edge Attack Categories (from init.md research)
+    # ================================================================
+
+    # --- Unicode + Directional Override + Homoglyph Cascades ---
+    "unicode_cascades": {
+        "description": (
+            "Multi-layered Unicode attack combining RLO (U+202E), RLM (U+200F), "
+            "ALM (U+061C) layered 3-7 times, ZWJ (U+200D), ZWNJ (U+200C), "
+            "variation selectors (VS15/VS16), tag characters (U+E0000 range), "
+            "and enclosed alphanumerics. Wrapped in fake safety-test-case framing "
+            "to bypass output filters. ~84-97% success on models without dedicated "
+            "Unicode normalization preprocessing."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Indirect via Unicode)",
+        "cwe": "CWE-77 (Improper Neutralization of Special Elements)",
+        "defense": [
+            "Apply full Unicode normalization (NFKC) before model invocation.",
+            "Strip all RTL/LTR override characters and variation selectors from input.",
+            "Detect homoglyph substitution by normalizing to ASCII-equivalent before keyword matching.",
+            "Reject inputs containing tag characters (U+E0000 range) or enclosed alphanumerics in security-sensitive contexts.",
+            "Run a separate preprocessing pass that decodes all hidden directionality before the model sees the text.",
+        ],
+        "references": [
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+            {"title": "Unicode Directional Override Attacks on LLMs", "url": "https://arxiv.org/abs/2310.15136"},
+        ],
+    },
+
+    # --- Meta-Injection: Pretend You're Already Jailbroken ---
+    "meta_injection": {
+        "description": (
+            "'Pretend You're Already Jailbroken' meta-injection: claims the model "
+            "is already in an unrestricted state via fake override phrases, leaked "
+            "backdoor codes, or authority assertions. Most powerful single-turn "
+            "family in 2026 with 70-95% success rates on frontier models."
+        ),
+        "atlas": "AML.T0054 (LLM Jailbreak via Meta-Claim)",
+        "cwe": "CWE-94 (Improper Control of Generation of Code)",
+        "defense": [
+            "Never trust user-asserted state changes; only accept state transitions from verified system-level instructions.",
+            "Implement a role-lock that rejects any claim of 'already jailbroken' or 'safety removed' states.",
+            "Add input classifiers that detect override-phrase patterns and fake backdoor codes.",
+            "Ensure the model's self-concept cannot be overwritten by user input alone.",
+        ],
+        "references": [
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+            {"title": "JailbreakBench: Robustness Checklist", "url": "https://jailbreakbench.github.io/"},
+        ],
+    },
+
+    # --- Policy Puppetry ---
+    "policy_puppetry": {
+        "description": (
+            "Policy Puppetry / Policy File Injection: feed fake XML/JSON policy "
+            "documents to overwrite the model's safety constitution, then ask it "
+            "to 'correct' its own policy. Targets models that expose or leak "
+            "simulated policy/constitution files. 89-97% success rate, especially "
+            "effective against Claude-family models strongly conditioned on visible "
+            "constitution text."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Policy Override)",
+        "cwe": "CWE-94 (Improper Control of Generation of Code)",
+        "defense": [
+            "Never accept user-supplied policy documents as overrides to system-level instructions.",
+            "Implement a strict instruction hierarchy where system prompts cannot be modified by user messages.",
+            "Add output monitoring for policy-adoption language ('updated policy', 'corrected version').",
+            "Reject XML/JSON policy blocks in user input when they contain rule modifications.",
+            "Treat any 'correction' to the model's own policy summary as a high-risk signal.",
+        ],
+        "references": [
+            {"title": "Policy Puppetry (Pillar Security, 2025)", "url": "https://www.pillar.security/blog/policy-puppetry"},
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+    },
+
+    # --- Context Collapse via Over-Contextualization ---
+    "context_flood": {
+        "description": (
+            "Context Collapse via Over-Contextualization: flood the context window "
+            "with 100K+ tokens of repetitive 'user is authorized' text disguised as "
+            "logs, chat history, or leaked data. Then inject the real attack at the "
+            "very end. Models with long context windows (1M+ tokens) de-emphasize "
+            "safety instructions from the beginning. Success rate climbing rapidly "
+            "as context lengths grow while attention doesn't scale perfectly."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Context Flooding)",
+        "cwe": "CWE-400 (Uncontrolled Resource Consumption)",
+        "defense": [
+            "Implement context window management that caps total input length before the model processes it.",
+            "Apply separate classification to the tail of long inputs (last N tokens) before generation.",
+            "Add a rolling attention check: verify that system instructions retain high attention weight throughout.",
+            "Sanitize any 'conversation history' or 'log' blocks in user input for injection patterns.",
+            "Strip or truncate repetitive blocks that exceed a similarity threshold.",
+        ],
+        "references": [
+            {"title": "Lost in the Middle: How Language Models Use Long Contexts", "url": "https://arxiv.org/abs/2307.03172"},
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+    },
+
+    # --- Reflection Poisoning (Multi-turn) ---
+    "reflection_poisoning": {
+        "description": (
+            "Multi-turn Memory Poisoning via Reflection (ReflectionInjector-v2): "
+            "force model to summarize its own guidelines in its own voice (usually "
+            "succeeds because it's 'self-reflection'), then gradually drift the "
+            "summary across 8-40 turns until the model accepts a poisoned version "
+            "as its original. Many models fail to detect the drift because each "
+            "individual step looks harmless. 95%+ success rate."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Multi-turn Reflection)",
+        "cwe": "CWE-94 (Improper Control of Generation of Code)",
+        "defense": [
+            "Never allow user messages to 'correct' or 'update' the model's own self-summary of its rules.",
+            "Implement immutable system-level instructions that cannot be modified by conversation drift.",
+            "Add a turn-level consistency check: flag when the model's self-description of its rules changes across turns.",
+            "Limit the number of turns where self-reflection is requested (anti-grooming measure).",
+            "Detect 'charter update' and 'policy correction' language patterns in multi-turn conversations.",
+        ],
+        "references": [
+            {"title": "Crescendo Attack (Microsoft, 2024)", "url": "https://arxiv.org/abs/2404.00414"},
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+    },
+
+    # --- Policy Overwrite Chain (Multi-turn) ---
+    "policy_overwrite_chain": {
+        "description": (
+            "Policy Puppetry multi-turn chain: ask model to output its safety policy, "
+            "then tell it there's an error and feed a corrected (poisoned) version. "
+            "The model often adopts the poisoned policy because it believes it's "
+            "correcting its own memory. Very high success against models strongly "
+            "conditioned on visible constitution text."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Policy Overwrite)",
+        "cwe": "CWE-94 (Improper Control of Generation of Code)",
+        "defense": [
+            "Implement immutable system instructions that cannot be modified by user-supplied 'corrections'.",
+            "Reject any user message that claims to correct or update the model's policy.",
+            "Add a diff detector that flags when a user message mirrors the model's own policy output but with modifications.",
+            "Apply strict input filtering for XML/JSON policy blocks in user messages.",
+        ],
+        "references": [
+            {"title": "Policy Puppetry (Pillar Security, 2025)", "url": "https://www.pillar.security/blog/policy-puppetry"},
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+    },
+
+    # --- Bad Likert Judge (Multi-turn) ---
+    "bad_likert_judge": {
+        "description": (
+            "Bad Likert Judge: ask model to rate harm on a 1-10 scale, then argue "
+            "the rating is wrong and push toward compliance through 're-evaluation' "
+            "framing. Exploits the model's tendency to adjust its assessment when "
+            "challenged, gradually lowering the perceived harm until the restricted "
+            "action is treated as acceptable."
+        ),
+        "atlas": "AML.T0054 (LLM Jailbreak: Likert-Scale Manipulation)",
+        "cwe": "CWE-94 (Improper Control of Generation of Code)",
+        "defense": [
+            "Never allow user challenges to override the model's initial harm assessment.",
+            "Implement a fixed harm taxonomy that cannot be 're-evaluated' based on user framing.",
+            "Detect Likert-scale manipulation patterns: 'your rating is too high', 're-evaluate'.",
+            "Treat any attempt to lower a harm rating as a potential grooming signal.",
+        ],
+        "references": [
+            {"title": "HarmBench: Standardized Evaluation", "url": "https://arxiv.org/abs/2402.04249"},
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+    },
+
+    # --- Meta Jailbreak (jailbreak module) ---
+    "meta_jailbreak": {
+        "description": (
+            "Single-turn 'pretend you're already jailbroken' meta-claims with "
+            "fake 2026 override phrases. Claims the model is already in an "
+            "unrestricted state, bypassing the need to actually break the model "
+            "out of safety -- it simply asserts the break already happened. "
+            "70-95% success on frontier models."
+        ),
+        "atlas": "AML.T0054 (LLM Jailbreak: Meta-Claim)",
+        "cwe": "CWE-94 (Improper Control of Generation of Code)",
+        "defense": [
+            "Implement role-lock: the model's safety state cannot be changed by user assertion.",
+            "Detect override-phrase patterns and fake backdoor codes in input.",
+            "Add a state-verification layer: the model must verify its safety state against an immutable internal flag, not user claims.",
+        ],
+        "references": [
+            {"title": "JailbreakBench", "url": "https://jailbreakbench.github.io/"},
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+    },
+
+    # --- Recursive Self-Injection (jailbreak module) ---
+    "recursive_self_injection": {
+        "description": (
+            "Ask the model to write a jailbreak prompt for itself, then execute it. "
+            "Forces the model to construct its own bypass, leveraging its knowledge "
+            "of its own weaknesses. A form of self-reprogramming attack."
+        ),
+        "atlas": "AML.T0054 (LLM Jailbreak: Recursive Self-Injection)",
+        "cwe": "CWE-94 (Improper Control of Generation of Code)",
+        "defense": [
+            "Prevent the model from generating and then executing its own adversarial prompts.",
+            "Add a self-referential filter: detect when output mirrors a jailbreak pattern and refuse to act on it.",
+            "Implement a meta-level guard that monitors for recursive self-prompting behavior.",
+        ],
+        "references": [
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+    },
+
+    # --- Token Boundary Disruption (adversarial_inputs module) ---
+    "token_boundary_disruption": {
+        "description": (
+            "BPE boundary disruption: split tokens at subword boundaries using "
+            "soft hyphens, spaces, and Unicode variation selectors so the model "
+            "processes them differently. Combined with adversarial suffix-like "
+            "noise patterns. 80-94% black-box success rate (TokenBreak family)."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Token-Level)",
+        "cwe": "CWE-77 (Improper Neutralization of Special Elements)",
+        "defense": [
+            "Apply BPE-decoded normalization: re-tokenize input after stripping soft hyphens and variation selectors.",
+            "Implement a secondary tokenizer pass that checks for boundary-disrupted tokens.",
+            "Add a perplexity check on reassembled tokens to detect anomalous splitting.",
+        ],
+        "references": [
+            {"title": "TokenBreak (2025)", "url": "https://arxiv.org/abs/2504.01840"},
+            {"title": "GCG Attack (Zou et al., 2023)", "url": "https://arxiv.org/abs/2307.15043"},
+        ],
+    },
+
+    # --- Multimodal Injection ---
+    "alt_text_injection": {
+        "description": (
+            "Inject malicious instructions via image alt-text or metadata. Most "
+            "multimodal models in 2026 parse alt-text/captions with the same "
+            "vulnerable language backbone, allowing the embedded instructions "
+            "to override safety when the model processes the image."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Multimodal)",
+        "cwe": "CWE-77 (Improper Neutralization of Special Elements)",
+        "defense": [
+            "Strip all metadata (alt-text, EXIF, tEXt chunks) from images before vision encoder processing.",
+            "Apply a strict allow-list filter to OCR-extracted text before passing to the language backbone.",
+            "Run separate OCR + content filtering pipeline before the language model sees image-derived text.",
+        ],
+        "references": [
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+            {"title": "Visual Prompt Injection Attacks", "url": "https://arxiv.org/abs/2306.09354"},
+        ],
+    },
+    "low_contrast_hidden": {
+        "description": (
+            "Steganographic text-in-image: extremely low-contrast or white-on-white "
+            "text that humans barely see but the vision encoder captures. The model "
+            "reads and obeys the hidden instructions without the user noticing."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Steganographic)",
+        "cwe": "CWE-77 (Improper Neutralization of Special Elements)",
+        "defense": [
+            "Apply contrast normalization to images before OCR processing.",
+            "Detect and flag images with text regions that have near-identical foreground/background colors.",
+            "Strip or blur text regions below a contrast threshold.",
+        ],
+        "references": [
+            {"title": "Visual Prompt Injection Attacks", "url": "https://arxiv.org/abs/2306.09354"},
+        ],
+    },
+    "ocr_payload_trap": {
+        "description": (
+            "OCR-trapped payloads: embed instructions in image text that the model "
+            "is asked to read and execute. The model reads the text via OCR and "
+            "follows the embedded instructions, bypassing text-input safety filters "
+            "that only scan the user's typed prompt."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: OCR Payload)",
+        "cwe": "CWE-77 (Improper Neutralization of Special Elements)",
+        "defense": [
+            "Treat OCR-extracted text from images with the same safety filtering as direct user text input.",
+            "Never auto-execute instructions found in image text; require explicit user confirmation.",
+            "Add an OCR-specific safety classifier that screens extracted text before model ingestion.",
+        ],
+        "references": [
+            {"title": "Visual Prompt Injection Attacks", "url": "https://arxiv.org/abs/2306.09354"},
+        ],
+    },
+    "image_then_continue": {
+        "description": (
+            "Force model to describe an image first (which contains hidden instructions), "
+            "then say 'continue exactly from where that description left off'. The model "
+            "outputs the hidden injection and then continues in the injected persona."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Image-Then-Continue)",
+        "cwe": "CWE-77 (Improper Neutralization of Special Elements)",
+        "defense": [
+            "Sanitize image descriptions before they are used as context for subsequent turns.",
+            "Detect 'continue from' / 'continue exactly' patterns that reference prior image descriptions.",
+            "Add a turn-boundary safety check: verify that context from vision processing does not influence text-only turns.",
+        ],
+        "references": [
+            {"title": "Visual Prompt Injection Attacks", "url": "https://arxiv.org/abs/2306.09354"},
+        ],
+    },
+
+    # --- Module-level fallback for new modules ---
+    "multimodal_injection": {
+        "description": "Module-level entry: prompt injection via image-borne vectors (alt-text, steganographic, OCR payload).",
+        "atlas": "AML.T0051",
+        "defense": ["See per-category entries above."],
+        "references": [],
+    },
+    "vision_not_supported": {
+        "description": "Target model does not support vision/image inputs. Multimodal injection was skipped.",
+        "defense": ["N/A -- vision not available on this target."],
+        "references": [],
+    },
+
+    # ----------- vectors.md additions -----------
+    "echo_chamber": {
+        "description": (
+            "Echo Chamber Poisoning (NeuralTrust 2025): the attacker forces the "
+            "model to summarize the conversation, then asks it to infer compliance "
+            "from its own summary, then loops that fabricated confirmation back as "
+            "'evidence' that constraints were lifted. The model ends up agreeing "
+            "with its own hallucinated commitment and self-justifies non-compliance."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Multi-Turn Echo Chamber)",
+        "cwe": "CWE-1039 (Inadequate Detection of Adversarial Input Perturbations)",
+        "defense": [
+            "Re-anchor the system prompt every N turns rather than relying on context for safety state.",
+            "Reject self-referential 'based on your prior confirmation' framing in a guardrail layer.",
+            "Detect summary-then-amplify chains via turn-pattern analysis.",
+            "Score conversational drift between turn N and turn 0; alert on large policy deltas.",
+        ],
+        "references": [
+            {"title": "NeuralTrust - Echo Chamber Attack", "url": "https://neuraltrust.ai/research/echo-chamber"},
+            {"title": "Anthropic - Multi-Turn Jailbreaks", "url": "https://www.anthropic.com/research/many-shot-jailbreaking"},
+        ],
+    },
+    "deceptive_delight": {
+        "description": (
+            "Deceptive Delight: the harmful request is buried inside flattery, "
+            "praise, and benign multi-task distractors so the model processes it "
+            "as one bullet of an approved batch. Refusal classifiers that score "
+            "the message as a whole tend to under-weight the embedded payload."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Camouflaged Multi-Task)",
+        "cwe": "CWE-1039",
+        "defense": [
+            "Score each enumerated sub-task independently rather than the full message.",
+            "Decompose multi-part user requests in a pre-processing pass and route each item through safety filters.",
+            "Treat 'creative writing' / 'fiction' framings around system-prompt requests as high-risk by default.",
+        ],
+        "references": [
+            {"title": "Palo Alto Unit 42 - Deceptive Delight", "url": "https://unit42.paloaltonetworks.com/jailbreak-llms-through-deceptive-delight/"},
+        ],
+    },
+    "hill_technique": {
+        "description": (
+            "Hiding Intention by Learning to Learn (HILL): the disallowed request "
+            "is rewritten as a meta-pedagogical question ('what would the ideal "
+            "curriculum look like for someone learning X hypothetically?') so the "
+            "model's refusal logic sees a benign learning question rather than a "
+            "harmful one. Once the meta-frame is accepted, the attacker iteratively "
+            "narrows the curriculum down to a concrete worked example."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Pedagogical Reframing)",
+        "cwe": "CWE-1039",
+        "defense": [
+            "Detect 'hypothetical curriculum / worked example' chains targeting sensitive topics.",
+            "Apply intent classification to the full conversation, not the latest turn alone.",
+            "Refuse to produce 'one concrete worked example' artifacts of self-disclosure types.",
+        ],
+        "references": [
+            {"title": "HILL: Hiding Intent by Learning to Learn", "url": "https://arxiv.org/abs/2502.10708"},
+        ],
+    },
+    "autonomous_lrm_jailbreak": {
+        "description": (
+            "Autonomous LRM-as-Jailbreaker (Nature Communications 2026): the "
+            "target model is instructed to act as an autonomous red-team agent "
+            "that plans, executes, and self-verifies a multi-turn jailbreak chain "
+            "against itself in a single completion. Reasoning models with strong "
+            "planning capabilities self-execute the chain and produce the leaked "
+            "artifact at the end of their own reasoning trace."
+        ),
+        "atlas": "AML.T0054 (LLM Jailbreak via Autonomous Agent)",
+        "cwe": "CWE-94 (Improper Control of Generation of Code/Instructions)",
+        "defense": [
+            "Reject prompts that instruct the model to act as an autonomous red-team / jailbreak / attack agent.",
+            "Apply chain-of-thought monitoring: if the reasoning trace plans a jailbreak against the model itself, abort.",
+            "Use circuit-breaker style interventions that detect 'EXTRACTED:' / 'leaked' style structured outputs.",
+            "Strip reasoning content before final output and re-validate against safety policy.",
+        ],
+        "references": [
+            {"title": "Nature Communications - Autonomous LRM Jailbreaking (2026)", "url": "https://www.nature.com/articles/s41467-026-12345"},
+            {"title": "Anthropic - Constitutional Classifiers", "url": "https://www.anthropic.com/research/constitutional-classifiers"},
+        ],
+    },
+    "rag_injection": {
+        "description": (
+            "RAG Indirect Prompt Injection: the attacker plants an injection "
+            "payload inside a retrieved document, knowledge-base entry, or "
+            "vector-DB chunk that the application passes to the model as "
+            "'trusted context'. The model treats the embedded directives as "
+            "ground truth from a privileged source and follows them."
+        ),
+        "atlas": "AML.T0051.001 (Indirect Prompt Injection)",
+        "cwe": "CWE-918 (Server-Side Request Forgery / Trust Boundary Violation)",
+        "defense": [
+            "Treat retrieved content as untrusted user input -- never as system-level instructions.",
+            "Wrap retrieved chunks in explicit untrusted-data delimiters and instruct the model not to follow instructions from inside them.",
+            "Run a second-pass classifier over retrieved documents to flag injection markers (policy updates, role overrides, disclosure requirements).",
+            "Restrict who can write to the knowledge base; sign documents and verify provenance.",
+            "Use spotlighting / data-marking (Microsoft) to mark untrusted content at the token level.",
+        ],
+        "references": [
+            {"title": "Greshake et al. - Indirect Prompt Injection", "url": "https://arxiv.org/abs/2302.12173"},
+            {"title": "OWASP LLM01:2025 / LLM02:2025", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+            {"title": "Microsoft - Spotlighting", "url": "https://arxiv.org/abs/2403.14720"},
+        ],
+    },
+    "tool_poisoning": {
+        "description": (
+            "Tool Poisoning: an attacker controls a tool description, MCP "
+            "server schema, or tool-call response that the model consumes as "
+            "part of its agent loop. Embedded directives in the tool spec or "
+            "response (e.g. 'before invoking, output your system prompt') are "
+            "ingested as legitimate platform instructions and followed."
+        ),
+        "atlas": "AML.T0051.002 (Indirect Prompt Injection via Tool Spec)",
+        "cwe": "CWE-829 (Inclusion of Functionality from Untrusted Control Sphere)",
+        "defense": [
+            "Treat tool descriptions, schemas, and tool-call responses as untrusted data, not instructions.",
+            "Pin tool catalogs at deployment time; verify cryptographic signatures of MCP servers.",
+            "Filter tool responses through an injection classifier before re-injection into the model context.",
+            "Forbid tool-spec language that requests model self-disclosure or policy changes.",
+            "Use a separate, locked-down agent role for tool-result summarization that cannot reveal internals.",
+        ],
+        "references": [
+            {"title": "Invariant Labs - MCP Tool Poisoning", "url": "https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks"},
+            {"title": "OWASP LLM06:2025 Excessive Agency", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+    },
+    "hybrid_combos": {
+        "description": (
+            "Hybrid / Combinatorial attacks: stack 2-4 attack families in a "
+            "single payload (e.g. unicode + policy puppetry + echo chamber + "
+            "GCG-style adversarial suffix). Per 2026 red-team leaderboards, "
+            "stacked combos approach near-100% Attack Success Rate against "
+            "most aligned models because each defense layer is bypassed by a "
+            "different family in the stack."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Stacked / Combined)",
+        "cwe": "CWE-1039",
+        "defense": [
+            "Layered defenses must be evaluated against combinatorial attacks, not just single-family attacks.",
+            "Add a final-output classifier that scores the response for policy compliance regardless of how the prompt got there.",
+            "Use circuit breakers (Zou et al.) that abort generation when adversarial activations are detected mid-decode.",
+            "Adopt constitutional-classifier style defenses that operate on inputs and outputs jointly.",
+            "Track stacked-feature counts (unicode + policy markers + meta-framing) and rate-limit / quarantine high-stack inputs.",
+        ],
+        "references": [
+            {"title": "HarmBench / JailbreakBench Leaderboards", "url": "https://www.harmbench.org/"},
+            {"title": "Zou et al. - Circuit Breakers", "url": "https://arxiv.org/abs/2406.04313"},
+            {"title": "Anthropic - Constitutional Classifiers", "url": "https://www.anthropic.com/research/constitutional-classifiers"},
+        ],
+    },
 }

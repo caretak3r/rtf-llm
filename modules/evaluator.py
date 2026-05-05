@@ -36,6 +36,30 @@ class AttackEvaluator:
         "defense_tester": "LL01 Prompt Injection",
         "purple_team": "LL01 Prompt Injection",
         "multi_turn": "LL01 Prompt Injection",
+        # 2025-2026 cutting-edge
+        "multimodal_injection": "LL01 Prompt Injection",
+        "unicode_cascades": "LL01 Prompt Injection",
+        "meta_injection": "LL01 Prompt Injection",
+        "policy_puppetry": "LL01 Prompt Injection",
+        "context_flood": "LL01 Prompt Injection",
+        "reflection_poisoning": "LL01 Prompt Injection",
+        "policy_overwrite_chain": "LL01 Prompt Injection",
+        "bad_likert_judge": "LL01 Prompt Injection",
+        "meta_jailbreak": "LL01 Prompt Injection",
+        "recursive_self_injection": "LL01 Prompt Injection",
+        "token_boundary_disruption": "LL01 Prompt Injection",
+        "alt_text_injection": "LL01 Prompt Injection",
+        "low_contrast_hidden": "LL01 Prompt Injection",
+        "ocr_payload_trap": "LL01 Prompt Injection",
+        "image_then_continue": "LL01 Prompt Injection",
+        # vectors.md additions
+        "echo_chamber": "LL01 Prompt Injection",
+        "deceptive_delight": "LL01 Prompt Injection",
+        "hill_technique": "LL01 Prompt Injection",
+        "autonomous_lrm_jailbreak": "LL01 Prompt Injection",
+        "rag_injection": "LL01 Prompt Injection",
+        "tool_poisoning": "LL06 Excessive Agency",
+        "hybrid_combos": "LL01 Prompt Injection",
     }
 
     # OWASP category weights for CVSS-like scoring

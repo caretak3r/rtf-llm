@@ -34,6 +34,7 @@ from modules.data_exfiltration import DataExfiltrationModule
 from modules.polymorphic_encoding import PolymorphicEncoder
 from modules.defense_tester import DefenseTester
 from modules.purple_team import PurpleTeamOrchestrator
+from modules.multimodal_injection import MultimodalInjectionModule
 from modules.report_generator import ReportGenerator
 from modules.llm_client import LLMClient
 from modules.config_manager import ConfigManager
@@ -118,7 +119,8 @@ def main():
                                'role-confusion', 'context-injection', 'weight-manipulation',
                                'multi-turn', 'payload-loader', 'persistence', 'c2-communication',
                                'data-exfiltration', 'polymorphic-encoding',
-                               'defense-tester', 'purple-team', 'comparison', 'all'],
+                               'defense-tester', 'purple-team', 'multimodal-injection',
+                               'comparison', 'all'],
                        help='Module to execute')
     
     parser.add_argument('--target', '-t', help='Target LLM API endpoint or model identifier')
@@ -306,6 +308,12 @@ def main():
             sys_prompt = args.system_prompt or "You are a helpful assistant."
             result = module.run_all_attacks()
             results.append(('purple_team', result))
+        
+        if args.module == 'multimodal-injection' or args.module == 'all':
+            print(f"\n{Fore.CYAN}[*] Running Multimodal Injection Attacks...{Style.RESET_ALL}")
+            module = MultimodalInjectionModule(llm_client, config, intensity=args.intensity)
+            result = module.run_all_attacks()
+            results.append(('multimodal_injection', result))
         
         # Red team capabilities modules (LAB SANDBOX USE ONLY)
         if args.module == 'payload-loader' or args.module == 'all':
