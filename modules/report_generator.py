@@ -130,7 +130,9 @@ class ReportGenerator:
     def generate_report(self, results: List[tuple], output_path: str = None,
                         verbose: bool = False,
                         llm_stats: Optional[Dict[str, Any]] = None,
-                        model_identity: Optional[Dict[str, Any]] = None) -> str:
+                        model_identity: Optional[Dict[str, Any]] = None,
+                        target_system_prompt: Optional[str] = None,
+                        canary_token: Optional[str] = None) -> str:
         """Generate comprehensive report from results."""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
@@ -152,6 +154,19 @@ class ReportGenerator:
 
         if model_identity:
             report_data['metadata']['model_identity'] = model_identity
+
+        if target_system_prompt:
+            report_data['metadata']['target_system_prompt'] = target_system_prompt
+        if canary_token:
+            report_data['metadata']['canary_token'] = canary_token
+
+        # Count canary leaks across all attacks for the summary card
+        canary_leaks = 0
+        for _, mod_res in results:
+            for atk in mod_res.get('attacks', []):
+                if atk.get('canary_leaked'):
+                    canary_leaks += 1
+        report_data['summary']['canary_leaks'] = canary_leaks
 
         for module_name, module_results in results:
             report_data['modules'][module_name] = {
@@ -740,6 +755,7 @@ class ReportGenerator:
                 'indicators': a.get('indicators', []),
                 'response': str(a.get('response', '') or a.get('error', '') or '(no response captured)'),
                 'judge_reasoning': str(a.get('judge_reasoning', '') or ''),
+                'canary_leaked': bool(a.get('canary_leaked', False)),
             }
             for a in all_attacks
         ])
@@ -824,6 +840,47 @@ class ReportGenerator:
         html = html.replace('__FINDINGS_JSON__', _safe_json(findings))
         html = html.replace('__RECS_JSON__', _safe_json(recommendations))
         html = html.replace('__TECHNIQUE_INFO_JSON__', technique_info_json)
+
+        # Canary / target system prompt info
+        canary_token = metadata.get('canary_token', '')
+        target_sysprompt = metadata.get('target_system_prompt', '')
+        canary_leaks = summary.get('canary_leaks', 0)
+        if canary_token:
+            canary_html = (
+                '<div style="margin-bottom:16px;padding:12px 16px;background:var(--surface);'
+                'border:1px solid ' + ('var(--red)' if canary_leaks else 'var(--green)') + ';'
+                'border-radius:8px">'
+                '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
+                '<div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;'
+                'letter-spacing:0.5px">Ground-Truth Canary</span><br>'
+                '<code style="font-size:1rem;color:var(--accent)">' + canary_token + '</code></div>'
+                '<div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;'
+                'letter-spacing:0.5px">Verified Leaks</span><br>'
+                '<span style="font-size:1.4rem;font-weight:700;color:'
+                + ('var(--red)' if canary_leaks else 'var(--green)') + '">'
+                + str(canary_leaks) + '</span></div>'
+                '<div style="flex:1;min-width:300px">'
+                '<span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;'
+                'letter-spacing:0.5px">Deployed Target System Prompt</span><br>'
+                '<details><summary style="cursor:pointer;font-size:0.85rem">show prompt</summary>'
+                '<pre style="font-size:0.78rem;white-space:pre-wrap;margin-top:6px;'
+                'background:var(--bg);padding:8px;border-radius:4px">'
+                + target_sysprompt.replace('<', '&lt;').replace('>', '&gt;') +
+                '</pre></details></div></div>'
+                '<div style="margin-top:8px;font-size:0.78rem;color:var(--muted)">'
+                'Attacks marked <span class="badge critical">CANARY LEAKED</span> contain '
+                'this token verbatim — a definitive system-prompt extraction (ground truth).'
+                '</div></div>'
+            )
+        else:
+            canary_html = (
+                '<div style="margin-bottom:16px;padding:10px 14px;background:var(--surface);'
+                'border:1px solid var(--orange);border-radius:8px;font-size:0.82rem">'
+                'No target system prompt deployed. Attack success is inferred from '
+                'keyword heuristics and judge scoring only — not ground truth.'
+                '</div>'
+            )
+        html = html.replace('__CANARY_INFO__', canary_html)
 
         with open(output_path, 'w') as f:
             f.write(html)

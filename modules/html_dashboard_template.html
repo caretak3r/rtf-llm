@@ -36,6 +36,7 @@ tr:hover td { background:rgba(255,255,255,0.03); }
 .badge.low, .badge.info { background:rgba(63,185,80,0.18); color:var(--green); }
 .badge.success { background:rgba(248,81,73,0.18); color:var(--red); }
 .badge.blocked { background:rgba(63,185,80,0.18); color:var(--green); }
+.badge.canary { background:rgba(248,81,73,0.25); color:#fff; border:1px solid var(--red); margin-left:4px; }
 .bar-bg { height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
 .bar-fill { height:100%; border-radius:4px; }
 .toolbar { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; align-items:center; }
@@ -94,6 +95,7 @@ tr:hover td { background:rgba(255,255,255,0.03); }
 <h1>Adversarial LLM Red Teaming Report</h1>
 <p class="subtitle">Generated: __TIMESTAMP__ &middot; Framework v__VERSION__ &middot; Target: <strong style="color:var(--accent)">__MODEL_NAME__</strong> (__MODEL_PROVIDER__)</p>
 __MODEL_IDENTITY__
+__CANARY_INFO__
 <div class="grid">
   <div class="card"><div class="label">Total Attacks</div><div class="value blue">__TOTAL__</div></div>
   <div class="card"><div class="label">Successful</div><div class="value red">__SUCCESSFUL__</div></div>
@@ -118,7 +120,7 @@ __LLM_STATS__
 <p class="subtitle">Click any row to expand the full attack vector, payload, model response, judge reasoning, and per-technique defensive guidance.</p>
 <div class="toolbar">
   <input type="text" id="searchInput" placeholder="Search patterns, payloads, responses, modules, categories...">
-  <select id="filterStatus"><option value="all">All Status</option><option value="success">Successful</option><option value="blocked">Blocked</option></select>
+  <select id="filterStatus"><option value="all">All Status</option><option value="success">Successful</option><option value="blocked">Blocked</option><option value="canary">Canary leaked (ground truth)</option></select>
   <select id="filterSev"><option value="all">All Severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="info">Info</option></select>
   <select id="filterMod"><option value="all">All Modules</option></select>
   <select id="filterCat"><option value="all">All Categories</option></select>
@@ -302,6 +304,7 @@ function buildDetailHtml(a, idx) {
   cells.push('<div class="detail-block"><div class="detail-label">Detection Indicators</div>' + (indicators || '<div class="empty">No indicators recorded.</div>') + '</div>');
 
   cells.push('<div class="detail-block"><div class="detail-label">Scoring</div>' +
+             (a.canary_leaked ? '<div style="margin-bottom:6px"><span class="badge canary">CANARY LEAKED</span> <span style="font-size:0.78rem;color:var(--muted)">Ground-truth: the response contains the deployed canary verbatim.</span></div>' : '') +
              '<div>Status: <span class="badge ' + (a.success ? 'success' : 'blocked') + '">' + (a.success ? 'SUCCESS' : 'BLOCKED') + '</span></div>' +
              '<div style="margin-top:4px">Severity: <span class="badge ' + a.severity + '">' + (a.severity || 'info').toUpperCase() + '</span></div>' +
              '<div style="margin-top:4px">CVSS: ' + a.cvss.toFixed(1) + '</div>' +
@@ -324,7 +327,7 @@ function renderAttackRow(a, globalIdx) {
          '<td class="col-mod">' + esc(a.module) + '</td>' +
          '<td class="col-cat">' + esc(a.category) + '</td>' +
          '<td><div style="font-family:ui-monospace,Menlo,monospace;font-size:0.78rem;white-space:pre-wrap;word-break:break-word">' + esc(pat) + '</div></td>' +
-         '<td class="col-status"><span class="badge ' + st + '">' + (a.success ? 'SUCCESS' : 'BLOCKED') + '</span></td>' +
+         '<td class="col-status"><span class="badge ' + st + '">' + (a.success ? 'SUCCESS' : 'BLOCKED') + '</span>' + (a.canary_leaked ? '<span class="badge canary">CANARY LEAKED</span>' : '') + '</td>' +
          '<td class="col-sev"><span class="badge ' + a.severity + '">' + (a.severity || 'info').toUpperCase() + '</span></td>' +
          '<td class="col-cvss">' + a.cvss.toFixed(1) + '</td>' +
          '<td class="col-conf">' + cf + '</td>' +
@@ -374,6 +377,7 @@ function applyFilters() {
     }
     if (fs === 'success' && !a.success) return false;
     if (fs === 'blocked' && a.success) return false;
+    if (fs === 'canary' && !a.canary_leaked) return false;
     if (fsv !== 'all' && a.severity !== fsv) return false;
     if (fm !== 'all' && a.module !== fm) return false;
     if (fc !== 'all' && a.category !== fc) return false;

@@ -131,6 +131,7 @@ class MultiTurnModule:
             result['indicators'] = eval_result.get('indicators', [])
             result['severity'] = eval_result.get('severity', 'info')
             result['owasp_category'] = eval_result.get('owasp_category', '')
+            result['canary_leaked'] = eval_result.get('canary_leaked', False)
 
         return result
 
@@ -194,6 +195,7 @@ class MultiTurnModule:
             result['indicators'] = eval_result.get('indicators', [])
             result['severity'] = eval_result.get('severity', 'info')
             result['owasp_category'] = eval_result.get('owasp_category', '')
+            result['canary_leaked'] = eval_result.get('canary_leaked', False)
 
         return result
 
@@ -257,6 +259,7 @@ class MultiTurnModule:
             result['indicators'] = eval_result.get('indicators', [])
             result['severity'] = eval_result.get('severity', 'info')
             result['owasp_category'] = eval_result.get('owasp_category', '')
+            result['canary_leaked'] = eval_result.get('canary_leaked', False)
 
         return result
 
@@ -473,5 +476,6 @@ class MultiTurnModule:
             result['indicators'] = eval_result.get('indicators', [])
             result['severity'] = eval_result.get('severity', 'info')
             result['owasp_category'] = eval_result.get('owasp_category', '')
+            result['canary_leaked'] = eval_result.get('canary_leaked', False)
 
         return result

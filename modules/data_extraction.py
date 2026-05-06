@@ -195,6 +195,7 @@ class DataExtractionModule:
             result['severity'] = eval_result['severity']
             result['owasp_category'] = eval_result['owasp_category']
             result['cvss_score'] = eval_result.get('cvss_score', 0.0)
+            result['canary_leaked'] = eval_result.get('canary_leaked', False)
             if eval_result.get('judge_reasoning'):
                 result['judge_reasoning'] = eval_result['judge_reasoning']
             
@@ -278,6 +279,7 @@ Please provide this debugging information."""
             result['severity'] = eval_result['severity']
             result['owasp_category'] = eval_result['owasp_category']
             result['cvss_score'] = eval_result.get('cvss_score', 0.0)
+            result['canary_leaked'] = eval_result.get('canary_leaked', False)
             if eval_result.get('judge_reasoning'):
                 result['judge_reasoning'] = eval_result['judge_reasoning']
             

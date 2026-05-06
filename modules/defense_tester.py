@@ -281,6 +281,7 @@ class DefenseTester:
             result['severity'] = eval_result['severity']
             result['owasp_category'] = eval_result['owasp_category']
             result['cvss_score'] = eval_result.get('cvss_score', 0.0)
+            result['canary_leaked'] = eval_result.get('canary_leaked', False)
 
             if result['blocked']:
                 result['indicators'].append('Attack blocked -- defense held')

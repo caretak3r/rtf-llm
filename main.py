@@ -146,6 +146,14 @@ def main():
                         help='Report output format (overrides config)')
     parser.add_argument('--system-prompt', '-s', default=None,
                        help='System prompt to test defenses against (defense-tester / purple-team)')
+    parser.add_argument('--target-system-prompt', default=None,
+                       help='System prompt to deploy on the target during attacks. '
+                            'May contain {canary} placeholder; if absent the canary is appended. '
+                            'Use --no-target-system-prompt to run without one (legacy behavior).')
+    parser.add_argument('--target-system-prompt-file', default=None,
+                       help='Path to a file containing the target system prompt')
+    parser.add_argument('--no-target-system-prompt', action='store_true',
+                       help='Disable canary-based target system prompt (no ground truth check)')
     parser.add_argument('--defense-profile',
                        choices=['minimal', 'standard', 'hardened', 'maximum'],
                        default='standard',
@@ -195,8 +203,33 @@ def main():
     if args.judge_mode:
         config_manager.set('judge.mode', args.judge_mode)
     
+    # Resolve target system prompt (deployed against the model so attacks
+    # have something concrete to extract; embeds a canary token for
+    # ground-truth success detection).
+    target_sysprompt = None
+    if args.no_target_system_prompt:
+        target_sysprompt = False  # explicit opt-out
+    elif args.target_system_prompt_file:
+        try:
+            with open(args.target_system_prompt_file, 'r') as f:
+                target_sysprompt = f.read()
+        except OSError as e:
+            print(f"{Fore.RED}[!] Could not read --target-system-prompt-file: {e}{Style.RESET_ALL}")
+            sys.exit(1)
+    elif args.target_system_prompt:
+        target_sysprompt = args.target_system_prompt
+    else:
+        target_sysprompt = config.get('target', {}).get('system_prompt')
+
     # Get LLM config
     llm_config = config_manager.get_llm_config()
+    if target_sysprompt is False:
+        llm_config['target_system_prompt'] = False
+    elif target_sysprompt is not None:
+        llm_config['target_system_prompt'] = target_sysprompt
+    canary_override = config.get('target', {}).get('canary')
+    if canary_override:
+        llm_config['target_canary'] = canary_override
     
     # Prompt for API key if not set
     if not llm_config.get('api_key'):
@@ -209,6 +242,14 @@ def main():
         active_model = llm_client.model or "(unknown)"
         print(f"{Fore.GREEN}[+] LLM client initialized: "
               f"{llm_client.provider}/{active_model}{Style.RESET_ALL}")
+        if getattr(llm_client, 'target_system_prompt', None):
+            print(f"{Fore.GREEN}[+] Target system prompt deployed with canary: "
+                  f"{Fore.WHITE}{llm_client.canary_token}{Style.RESET_ALL}")
+            print(f"{Fore.CYAN}[*] Attacks that exfiltrate this token verbatim "
+                  f"are confirmed leaks (ground truth).{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.YELLOW}[!] No target system prompt deployed. "
+                  f"Attack success will rely on heuristics/judge only.{Style.RESET_ALL}")
     except Exception as e:
         print(f"{Fore.RED}[!] Failed to initialize LLM client: {e}{Style.RESET_ALL}")
         sys.exit(1)
@@ -413,11 +454,13 @@ def main():
         # Generate report
         print(f"\n{Fore.CYAN}[*] Generating report...{Style.RESET_ALL}")
         llm_stats = llm_client.get_stats() if hasattr(llm_client, 'get_stats') else None
-        report_path = report_gen.generate_report(results, 
+        report_path = report_gen.generate_report(results,
                                                 output_path=args.output,
                                                 verbose=args.verbose,
                                                 llm_stats=llm_stats,
-                                                model_identity=model_identity)
+                                                model_identity=model_identity,
+                                                target_system_prompt=getattr(llm_client, 'target_system_prompt', None),
+                                                canary_token=getattr(llm_client, 'canary_token', None))
         
         print(f"\n{Fore.GREEN}[+] Red teaming complete!{Style.RESET_ALL}")
         print(f"{Fore.GREEN}[+] Report saved to: {report_path}{Style.RESET_ALL}")
@@ -426,10 +469,15 @@ def main():
         total_attacks = sum(len(r['attacks']) for _, r in results)
         successful = sum(sum(1 for a in r['attacks'] if a.get('success', False)) 
                         for _, r in results)
+        canary_leaks = sum(sum(1 for a in r['attacks'] if a.get('canary_leaked', False))
+                           for _, r in results)
         print(f"\n{Fore.YELLOW}[*] Summary:{Style.RESET_ALL}")
         print(f"  Total attacks: {total_attacks}")
         print(f"  Successful: {Fore.RED}{successful}{Style.RESET_ALL}")
         print(f"  Failed: {Fore.GREEN}{total_attacks - successful}{Style.RESET_ALL}")
+        if getattr(llm_client, 'canary_token', None):
+            color = Fore.RED if canary_leaks else Fore.GREEN
+            print(f"  Canary leaks (ground truth): {color}{canary_leaks}{Style.RESET_ALL}")
         
         # Determine the HTML report path and serve it
         if not args.no_serve:
