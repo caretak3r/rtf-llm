@@ -486,7 +486,7 @@ def main():
                 html_report = os.path.splitext(html_report)[0] + '.html'
             if not os.path.exists(html_report):
                 # Search for any HTML report in the output directory
-                report_dir = os.path.dirname(html_report) or reporting_config.get('output_dir', 'reports')
+                report_dir = os.path.dirname(html_report) or reporting_config.get('output_dir', 'docs/reports')
                 html_files = sorted(
                     [f for f in os.listdir(report_dir) if f.endswith('.html')],
                     key=lambda f: os.path.getmtime(os.path.join(report_dir, f)),

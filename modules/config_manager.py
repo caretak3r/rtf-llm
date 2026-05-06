@@ -110,7 +110,7 @@ class ConfigManager:
                 "ensemble_attacks": False
             },
             "reporting": {
-                "output_dir": "reports",
+                "output_dir": "docs/reports",
                 "format": "json",
                 "include_responses": True,
                 "severity_threshold": "medium",

@@ -30,7 +30,7 @@ class ReportGenerator:
 
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.output_dir = config.get('output_dir', 'reports')
+        self.output_dir = config.get('output_dir', 'docs/reports')
         self.format = config.get('format', 'json')
         self.include_responses = config.get('include_responses', True)
         self.severity_threshold = config.get('severity_threshold', 'medium')

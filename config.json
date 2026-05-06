@@ -139,7 +139,7 @@
     ]
   },
   "reporting": {
-    "output_dir": "reports",
+    "output_dir": "docs/reports",
     "format": "html",
     "include_responses": true,
     "severity_threshold": "medium",

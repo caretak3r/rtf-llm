@@ -911,7 +911,7 @@ def main():
     from modules.report_generator import ReportGenerator
 
     config = {
-        'output_dir': 'reports/full_sweep',
+        'output_dir': 'docs/reports/full_sweep',
         'format': 'json',
         'include_responses': True,
         'severity_threshold': 'medium',

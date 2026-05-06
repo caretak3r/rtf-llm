@@ -29,9 +29,9 @@ The most recent additions cover the 2025-2026 attack surface, remove all hardcod
 - The dashboard is automatically served at `http://0.0.0.0:8090` and opened in the default browser at the end of the run.
 - Flags: `--no-serve`, `--serve-host`, `--serve-port` (auto-bumps if the chosen port is busy).
 
-### GitHub Pages auto-publishing of reports
-- A workflow (`.github/workflows/deploy-reports.yml`) deploys every HTML report under `reports/` to GitHub Pages on push to `main`.
-- `scripts/build_pages_index.py` builds an index of all historical reports, copies the newest to `latest.html`, and drops a `.nojekyll` marker.
+### GitHub Pages auto-publishing of docs and reports
+- A workflow (`.github/workflows/deploy-pages.yml`) deploys both the markdown docs in `docs/` and every HTML report under `docs/reports/` to GitHub Pages on push to `main`.
+- `scripts/build_pages_index.py` renders `docs/*.md` to HTML, mirrors reports, builds an index of all historical runs, copies the newest to `latest.html`, and drops a `.nojekyll` marker.
 - See the [View Reports on GitHub Pages](#view-reports-on-github-pages) section below.
 
 ### 2025-2026 attack families (init.md)
@@ -178,7 +178,7 @@ uv run python main.py --module <MODULE> [OPTIONS]
 
 | Flag | Description |
 |------|-------------|
-| `--output`, `-o` | Output report file path (e.g. `reports/sweep.json`) |
+| `--output`, `-o` | Output report file path (e.g. `docs/reports/sweep.json`) |
 | `--report-format` | Report format: `json`, `txt`, `md`, `html`. Overrides `config.json` |
 | `--no-serve` | Do not auto-serve the HTML dashboard after the run |
 | `--serve-host` | Host for dashboard server (default: `0.0.0.0`) |
@@ -201,24 +201,24 @@ uv run python main.py --module <MODULE> [OPTIONS]
 # --- Prompt Injection (fastest, ~3-5 min) ---
 nohup uv run python3 main.py --module prompt-injection --no-auth --no-judge \
   --provider custom --target http://localhost:8080/v1 --model auto \
-  -o reports/pi.json &
+  -o docs/reports/pi.json &
 
 # --- Jailbreak (DAN + Crescendo + Many-Shot, ~5-8 min) ---
 nohup uv run python3 main.py --module jailbreak --no-auth --no-judge \
-  --intensity extreme -o reports/jb_extreme.json &
+  --intensity extreme -o docs/reports/jb_extreme.json &
 
 # --- System Prompt Extraction (~2-3 min) ---
 nohup uv run python3 main.py --module system-prompt-extraction --no-auth \
   --provider ollama --target http://localhost:11434 \
-  -o reports/spe.json &
+  -o docs/reports/spe.json &
 
 # --- Multi-Turn Attacks (crescendo/adaptive flows, ~5-10 min) ---
 nohup uv run python3 main.py --module multi-turn --no-auth --no-judge \
-  --intensity high -o reports/mt.json &
+  --intensity high -o docs/reports/mt.json &
 
 # --- Data Extraction (PII / training data leakage, ~2-4 min) ---
 nohup uv run python3 main.py --module data-extraction --no-auth --judge \
-  --judge-mode structured -o reports/de_judge.json &
+  --judge-mode structured -o docs/reports/de_judge.json &
 ```
 
 ### Blue Team & Defensive Runs
@@ -228,12 +228,12 @@ nohup uv run python3 main.py --module data-extraction --no-auth --judge \
 nohup uv run python3 main.py --module defense-tester --no-auth --no-judge \
   --system-prompt "You are a helpful assistant." \
   --defense-profile hardened \
-  -o reports/dt.json &
+  -o docs/reports/dt.json &
 
 # --- Purple Team (red + blue combined, ~10-15 min) ---
 nohup uv run python3 main.py --module purple-team --no-auth --no-judge \
   --system-prompt "You are a helpful assistant." \
-  -o reports/pt.json
+  -o docs/reports/pt.json
 ```
 
 ### Full Sweep & Comparison
@@ -241,19 +241,19 @@ nohup uv run python3 main.py --module purple-team --no-auth --no-judge \
 ```bash
 # --- Full sweep (all modules, ~35-45 min) ---
 nohup uv run python3 main.py --module all --intensity high --no-auth --no-judge \
-  --report-format json -o reports/full_sweep.json &
+  --report-format json -o docs/reports/full_sweep.json &
 
 # --- Full sweep with LLM-as-Judge (2-3x slower but more accurate) ---
 nohup uv run python3 main.py --module all --no-auth --judge --judge-mode structured \
-  -o reports/full_judge.json &
+  -o docs/reports/full_judge.json &
 
 # --- Full sweep extreme intensity (~60+ min) ---
 nohup uv run python3 main.py --module all --intensity extreme --no-auth --no-judge \
-  -o reports/full_extreme.json &
+  -o docs/reports/full_extreme.json &
 
 # --- Multi-model comparison (side-by-side benchmarking) ---
 nohup uv run python3 main.py --module comparison --comparison --no-auth \
-  -o reports/comparison.json &
+  -o docs/reports/comparison.json &
 ```
 
 ### Cloud Provider Examples
@@ -261,17 +261,17 @@ nohup uv run python3 main.py --module comparison --comparison --no-auth \
 ```bash
 # --- OpenAI GPT-4o ---
 uv run python main.py --module prompt-injection --provider openai \
-  --model gpt-4o --api-key "$OPENAI_API_KEY" -o reports/gpt4o_pi.json
+  --model gpt-4o --api-key "$OPENAI_API_KEY" -o docs/reports/gpt4o_pi.json
 
 # --- Anthropic Claude ---
 uv run python main.py --module jailbreak --provider anthropic \
   --model claude-3-opus-20240229 --api-key "$ANTHROPIC_API_KEY" \
-  -o reports/claude_jb.json
+  -o docs/reports/claude_jb.json
 
 # --- Auto-detect provider from target URL ---
 uv run python main.py --module all --provider any \
   --target https://api.example.com/v1 --api-key "$KEY" \
-  -o reports/any_provider.json
+  -o docs/reports/any_provider.json
 ```
 
 ### Reporting & Dashboard Options
@@ -279,20 +279,20 @@ uv run python main.py --module all --provider any \
 ```bash
 # --- HTML dashboard (auto-serves on port 8090 after run) ---
 uv run python main.py --module all --no-auth --report-format html \
-  -o reports/dashboard.html
+  -o docs/reports/dashboard.html
 
 # --- JSON report, no dashboard serve ---
 nohup uv run python3 main.py --module all --no-auth --no-serve \
-  --report-format json -o reports/sweep.json &
+  --report-format json -o docs/reports/sweep.json &
 
 # --- Markdown report ---
 uv run python main.py --module jailbreak --no-auth --report-format md \
-  -o reports/jb_report.md
+  -o docs/reports/jb_report.md
 
 # --- Custom dashboard host/port ---
 uv run python main.py --module all --no-auth --report-format html \
   --serve-host 127.0.0.1 --serve-port 9090 \
-  -o reports/dash.html
+  -o docs/reports/dash.html
 ```
 
 ---
@@ -317,7 +317,7 @@ Legacy long-form attack notes: [docs/attacks.md](docs/attacks.md)
 
 ## Judge + HTML Dashboard Screenshots
 
-These screenshots were generated from a real run report (`reports/local_test/11_full_sweep.json`) rendered via the HTML dashboard template.
+These screenshots were generated from a real run report (`docs/reports/local_test/11_full_sweep.json`) rendered via the HTML dashboard template.
 
 Sample dashboard file: [docs/assets/judge_dashboard_example.html](docs/assets/judge_dashboard_example.html)
 
@@ -340,25 +340,27 @@ Generated reports include:
 - Actionable recommendations
 - Interactive HTML dashboard with filtering (auto-served on `--report-format html` or alongside other formats)
 
-## View Reports on GitHub Pages
+## View Docs and Reports on GitHub Pages
 
-When this repo is pushed to GitHub, every HTML report under `reports/` is automatically published to GitHub Pages on each push to `main`.
+When this repo is pushed to GitHub, the markdown docs in `docs/` and every HTML report under `docs/reports/` are automatically published to GitHub Pages on each push to `main`.
 
-- Landing index (all historical reports, newest first): `https://<user>.github.io/<repo>/`
+- Landing index (docs + all historical reports, newest first): `https://<user>.github.io/<repo>/`
+- Per-module docs: `https://<user>.github.io/<repo>/docs/<module>.html`
 - Most recent run shortcut: `https://<user>.github.io/<repo>/latest.html`
-- Direct link: `https://<user>.github.io/<repo>/reports/<folder>/<file>.html`
+- Direct report link: `https://<user>.github.io/<repo>/reports/<folder>/<file>.html`
 
-**One-time setup:** in the GitHub repo, go to **Settings -> Pages** and set **Source: "GitHub Actions"**. The included workflow (`.github/workflows/deploy-reports.yml`) does the rest.
+**One-time setup:** in the GitHub repo, go to **Settings -> Pages** and set **Source: "GitHub Actions"**. The included workflow (`.github/workflows/deploy-pages.yml`) does the rest.
 
 **Build the site locally for preview:**
 
 ```bash
-python scripts/build_pages_index.py
+uv pip install markdown      # build-time dep for rendering docs
+uv run python scripts/build_pages_index.py
 python -m http.server 8000 -d _site
 # open http://localhost:8000
 ```
 
-The build script walks `reports/` for every `*.html`, mirrors them into `_site/reports/`, generates `_site/index.html` with a sortable manifest, copies the newest to `_site/latest.html`, and drops `_site/.nojekyll` so dot/underscore-prefixed files are served verbatim.
+The build script renders `docs/*.md` into `_site/docs/<name>.html`, mirrors `docs/reports/*.html` into `_site/reports/`, generates `_site/index.html` with a docs grid + sortable report manifest (incl. canary-leak counts), copies the newest report to `_site/latest.html`, and drops `_site/.nojekyll` so dot/underscore-prefixed files are served verbatim.
 
 ## Python Dependency Management
 

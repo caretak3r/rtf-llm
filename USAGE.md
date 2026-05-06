@@ -141,7 +141,7 @@ python main.py --module all \
 
 ### Report Generation
 
-Reports are automatically generated in the `reports/` directory:
+Reports are automatically generated in the `docs/reports/` directory (so they're picked up by the GitHub Pages publisher):
 
 ```bash
 # JSON report (default)
