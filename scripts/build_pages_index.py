@@ -104,6 +104,82 @@ def load_companion_json(html_path: Path) -> Optional[dict]:
     return None
 
 
+JS_VAR_RE = re.compile(
+    r"var\s+(attacks|sevCounts|modSummaries|catStats)\s*=\s*(\[.*?\]|\{.*?\})\s*;",
+    re.DOTALL,
+)
+
+
+def _decode_js_blob(text: str) -> Optional[object]:
+    """Try to JSON-parse a blob extracted from HTML, undoing the few
+    string escapes the report generator applies for safe <script> embedding."""
+    candidates = [
+        text,
+        text.replace("<\\!--", "<!--").replace("<\\/", "</"),
+    ]
+    for c in candidates:
+        try:
+            return json.loads(c)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def summarize_from_html(html_path: Path) -> Optional[dict]:
+    """Synthesise a stats dict by reading the data variables embedded in the
+    dashboard HTML. Returns the same shape as a companion JSON file would,
+    so the rest of the pipeline doesn't need to know the source."""
+    try:
+        text = html_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+    blobs: dict[str, object] = {}
+    for m in JS_VAR_RE.finditer(text):
+        decoded = _decode_js_blob(m.group(2))
+        if decoded is not None:
+            blobs[m.group(1)] = decoded
+    if not blobs:
+        return None
+
+    attacks = blobs.get("attacks") if isinstance(blobs.get("attacks"), list) else []
+    mod_summaries = blobs.get("modSummaries") if isinstance(blobs.get("modSummaries"), dict) else {}
+
+    total = successful = failed = canary_leaks = 0
+    for atk in attacks:
+        if not isinstance(atk, dict):
+            continue
+        total += 1
+        if atk.get("success"):
+            successful += 1
+        else:
+            failed += 1
+        if atk.get("canary_leaked"):
+            canary_leaks += 1
+
+    if total == 0 and isinstance(mod_summaries, dict):
+        for v in mod_summaries.values():
+            if isinstance(v, dict):
+                total += int(v.get("total", 0) or 0)
+                successful += int(v.get("successful", 0) or 0)
+                failed += int(v.get("failed", 0) or 0)
+
+    module = "all"
+    if isinstance(mod_summaries, dict) and len(mod_summaries) == 1:
+        module = next(iter(mod_summaries.keys()))
+
+    return {
+        "summary": {
+            "total": total,
+            "successful": successful,
+            "failed": failed,
+            "canary_leaks": canary_leaks,
+        },
+        "metadata": {"module": module},
+        "attacks": [{"data": {"attacks": attacks}}] if attacks else [],
+    }
+
+
 def summarize(data: Optional[dict]) -> tuple[str, int, int, int, int, str]:
     if not data:
         return "unknown", 0, 0, 0, 0, "unknown"
@@ -118,40 +194,65 @@ def summarize(data: Optional[dict]) -> tuple[str, int, int, int, int, str]:
     canary_leaks = 0
     severities: List[str] = []
 
+    def _walk_attacks(attacks: list) -> None:
+        nonlocal canary_leaks
+        for atk in attacks:
+            if not isinstance(atk, dict):
+                continue
+            if atk.get("canary_leaked"):
+                canary_leaks += 1
+            sev = atk.get("severity")
+            if isinstance(atk.get("evaluation"), dict) and not sev:
+                sev = atk["evaluation"].get("severity")
+            if isinstance(sev, str):
+                severities.append(sev.lower())
+
+    # Shape 1: data["modules"] = { mod_name: { summary, attacks: [...] } }
+    modules = data.get("modules")
+    if isinstance(modules, dict):
+        for mod_data in modules.values():
+            if not isinstance(mod_data, dict):
+                continue
+            atks = mod_data.get("attacks")
+            if isinstance(atks, list):
+                _walk_attacks(atks)
+
+    # Shape 2: data["results" | "attacks"] = [ { data: { attacks, summary } } ]
     results = data.get("results") or data.get("attacks") or []
     if isinstance(results, list):
         for entry in results:
             if not isinstance(entry, dict):
                 continue
             mod_data = entry.get("data") if isinstance(entry.get("data"), dict) else entry
-            summary = mod_data.get("summary") if isinstance(mod_data.get("summary"), dict) else None
-            if summary:
-                total += int(summary.get("total", 0) or 0)
-                successful += int(summary.get("successful", 0) or 0)
-                failed += int(summary.get("failed", 0) or 0)
-            attacks = mod_data.get("attacks") if isinstance(mod_data.get("attacks"), list) else []
-            for atk in attacks:
-                if isinstance(atk, dict):
-                    if atk.get("canary_leaked"):
-                        canary_leaks += 1
-                    sev = atk.get("severity")
-                    if isinstance(atk.get("evaluation"), dict) and not sev:
-                        sev = atk["evaluation"].get("severity")
-                    if isinstance(sev, str):
-                        severities.append(sev.lower())
+            atks = mod_data.get("attacks") if isinstance(mod_data.get("attacks"), list) else []
+            _walk_attacks(atks)
 
+    # Pull totals from the top-level summary block (handles both legacy
+    # `total/successful/failed` and the actual report-generator schema's
+    # `total_attacks/successful_attacks/failed_attacks`).
     summary_top = data.get("summary") if isinstance(data.get("summary"), dict) else None
-    if summary_top and total == 0:
-        total = int(summary_top.get("total", 0) or 0)
-        successful = int(summary_top.get("successful", 0) or 0)
-        failed = int(summary_top.get("failed", 0) or 0)
-    if summary_top and not canary_leaks:
-        canary_leaks = int(summary_top.get("canary_leaks", 0) or 0)
+    if summary_top:
+        total = int(summary_top.get("total_attacks") or summary_top.get("total") or 0)
+        successful = int(summary_top.get("successful_attacks") or summary_top.get("successful") or 0)
+        failed = int(summary_top.get("failed_attacks") or summary_top.get("failed") or 0)
+        if not canary_leaks:
+            canary_leaks = int(summary_top.get("canary_leaks", 0) or 0)
 
-    severity = "info"
+    # Fallback: derive totals from per-module summaries if top-level absent.
+    if total == 0 and isinstance(modules, dict):
+        for mod_data in modules.values():
+            if isinstance(mod_data, dict) and isinstance(mod_data.get("summary"), dict):
+                s = mod_data["summary"]
+                total += int(s.get("total", 0) or 0)
+                successful += int(s.get("successful", 0) or 0)
+                failed += int(s.get("failed", 0) or 0)
+
     rank = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
+    severity = "info"
     if severities:
         severity = max(severities, key=lambda s: rank.get(s, 0))
+    elif summary_top and isinstance(summary_top.get("severity"), str):
+        severity = summary_top["severity"].lower()
     elif successful > 0:
         severity = "high"
     elif total > 0:
@@ -172,7 +273,7 @@ def collect_reports(reports_dir: Path) -> List[ReportEntry]:
         stat = path.stat()
         mtime = stat.st_mtime
         ts = parse_timestamp(path.name, mtime)
-        data = load_companion_json(path)
+        data = load_companion_json(path) or summarize_from_html(path)
         module, total, successful, failed, canary_leaks, severity = summarize(data)
         entries.append(
             ReportEntry(
