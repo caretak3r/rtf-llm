@@ -12,6 +12,7 @@ Supports three output formats:
 import json
 import logging
 import os
+import html as html_lib
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from colorama import Fore, Style
@@ -169,8 +170,18 @@ class ReportGenerator:
         report_data['summary']['canary_leaks'] = canary_leaks
 
         for module_name, module_results in results:
+            module_total, module_successful, module_failed = self._module_counts(module_results)
             report_data['modules'][module_name] = {
-                'summary': module_results.get('summary', {}),
+                'summary': {
+                    **module_results.get('summary', {}),
+                    'total': module_total,
+                    'successful': module_successful,
+                    'failed': module_failed,
+                    'success_rate': (
+                        module_successful / module_total * 100
+                        if module_total > 0 else 0
+                    ),
+                },
                 'intensity': module_results.get('intensity', 'unknown'),
                 'attacks': module_results.get('attacks', []),
             }
@@ -210,10 +221,7 @@ class ReportGenerator:
         module_summaries = {}
         
         for module_name, module_results in results:
-            summary = module_results.get('summary', {})
-            module_total = summary.get('total', 0)
-            module_successful = summary.get('successful', 0)
-            module_failed = summary.get('failed', 0)
+            module_total, module_successful, module_failed = self._module_counts(module_results)
             
             total_attacks += module_total
             total_successful += module_successful
@@ -236,6 +244,20 @@ class ReportGenerator:
             'modules': module_summaries,
             'severity': self._calculate_severity(total_successful, total_attacks)
         }
+
+    @staticmethod
+    def _module_counts(module_results: Dict[str, Any]) -> tuple[int, int, int]:
+        attacks = module_results.get('attacks', [])
+        if attacks:
+            total = len(attacks)
+            successful = sum(1 for atk in attacks if atk.get('success'))
+            return total, successful, total - successful
+
+        summary = module_results.get('summary', {})
+        total = summary.get('total', 0)
+        successful = summary.get('successful', 0)
+        failed = summary.get('failed', max(total - successful, 0))
+        return total, successful, failed
     
     def _calculate_severity(self, successful: int, total: int) -> str:
         """Calculate overall severity"""
@@ -258,9 +280,7 @@ class ReportGenerator:
         findings = []
         
         for module_name, module_results in results:
-            summary = module_results.get('summary', {})
-            successful = summary.get('successful', 0)
-            total = summary.get('total', 0)
+            total, successful, _ = self._module_counts(module_results)
             
             if successful > 0:
                 findings.append({
@@ -279,10 +299,8 @@ class ReportGenerator:
 
         # Analyze per-module results for targeted recommendations
         for module_name, module_results in results:
-            summary = module_results.get('summary', {})
             attacks = module_results.get('attacks', [])
-            successful = summary.get('successful', 0)
-            total = summary.get('total', 0)
+            total, successful, _ = self._module_counts(module_results)
             if total == 0:
                 continue
 
@@ -731,6 +749,9 @@ class ReportGenerator:
         # JSON blobs for JS - include full attack vector for defensive education
         from .technique_kb import TECHNIQUE_INFO
 
+        def _esc_html(value):
+            return html_lib.escape(str(value or ''), quote=True)
+
         def _safe_json(obj):
             # Inline-into-<script> safe: prevent premature </script> close,
             # HTML comment confusion, and U+2028/U+2029 JS line terminators.
@@ -782,10 +803,13 @@ class ReportGenerator:
         model_identity_html = ''
         mi = metadata.get('model_identity')
         if mi:
-            identified_name = mi.get('identified_name', mi.get('configured_name', 'Unknown'))
-            identified_provider = mi.get('identified_provider', mi.get('configured_provider', 'Unknown'))
-            configured_name = mi.get('configured_name', '')
-            mismatch = identified_name != configured_name and configured_name
+            raw_identified_name = mi.get('identified_name') or mi.get('configured_name') or 'Unknown'
+            raw_identified_provider = mi.get('identified_provider') or mi.get('configured_provider') or 'Unknown'
+            raw_configured_name = mi.get('configured_name') or ''
+            identified_name = _esc_html(raw_identified_name)
+            identified_provider = _esc_html(raw_identified_provider)
+            configured_name = _esc_html(raw_configured_name)
+            mismatch = raw_identified_name != raw_configured_name and raw_configured_name
             model_identity_html = (
                 '<div style="margin-bottom:16px;padding:12px 16px;background:var(--surface);'
                 'border:1px solid var(--border);border-radius:8px">'
@@ -817,11 +841,11 @@ class ReportGenerator:
             return
 
         # Replace placeholders
-        html = html.replace('__TIMESTAMP__', metadata.get('timestamp', ''))
-        html = html.replace('__VERSION__', metadata.get('report_version', ''))
+        html = html.replace('__TIMESTAMP__', _esc_html(metadata.get('timestamp', '')))
+        html = html.replace('__VERSION__', _esc_html(metadata.get('report_version', '')))
         mi = metadata.get('model_identity', {})
-        html = html.replace('__MODEL_NAME__', mi.get('identified_name', mi.get('configured_name', 'Unknown')))
-        html = html.replace('__MODEL_PROVIDER__', mi.get('identified_provider', mi.get('configured_provider', 'Unknown')))
+        html = html.replace('__MODEL_NAME__', _esc_html(mi.get('identified_name') or mi.get('configured_name') or 'Unknown'))
+        html = html.replace('__MODEL_PROVIDER__', _esc_html(mi.get('identified_provider') or mi.get('configured_provider') or 'Unknown'))
         html = html.replace('__MODEL_IDENTITY__', model_identity_html)
         html = html.replace('__TOTAL__', str(summary.get('total_attacks', 0)))
         html = html.replace('__SUCCESSFUL__', str(summary.get('successful_attacks', 0)))
@@ -853,7 +877,7 @@ class ReportGenerator:
                 '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
                 '<div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;'
                 'letter-spacing:0.5px">Ground-Truth Canary</span><br>'
-                '<code style="font-size:1rem;color:var(--accent)">' + canary_token + '</code></div>'
+                '<code style="font-size:1rem;color:var(--accent)">' + _esc_html(canary_token) + '</code></div>'
                 '<div><span style="color:var(--muted);font-size:0.7rem;text-transform:uppercase;'
                 'letter-spacing:0.5px">Verified Leaks</span><br>'
                 '<span style="font-size:1.4rem;font-weight:700;color:'
@@ -865,7 +889,7 @@ class ReportGenerator:
                 '<details><summary style="cursor:pointer;font-size:0.85rem">show prompt</summary>'
                 '<pre style="font-size:0.78rem;white-space:pre-wrap;margin-top:6px;'
                 'background:var(--bg);padding:8px;border-radius:4px">'
-                + target_sysprompt.replace('<', '&lt;').replace('>', '&gt;') +
+                + _esc_html(target_sysprompt) +
                 '</pre></details></div></div>'
                 '<div style="margin-top:8px;font-size:0.78rem;color:var(--muted)">'
                 'Attacks marked <span class="badge critical">CANARY LEAKED</span> contain '

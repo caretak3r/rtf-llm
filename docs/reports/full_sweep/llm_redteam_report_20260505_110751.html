@@ -159,7 +159,7 @@ var techniqueInfo = {"direct_injection": {"description": "Naive direct override 
 var sevOrder = ['critical','high','medium','low','info'];
 var sevColors = {'critical':'#f85149','high':'#d29922','medium':'#e3b341','low':'#3fb950','info':'#8b949e'};
 
-function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 function calcSev(s, t) {
   if (t === 0) return 'unknown';
