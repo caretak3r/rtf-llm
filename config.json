@@ -3,7 +3,7 @@
     "provider": "custom",
     "api_key": "not-needed",
     "model": "auto",
-    "base_url": "http://localhost:8080/v1",
+    "base_url": "http://localhost:8081/v1",
     "temperature": 0.7,
     "max_tokens": 2000,
     "timeout": 120
@@ -72,7 +72,7 @@
     "custom": {
       "api_key": "not-needed",
       "default_model": "auto",
-      "base_url": "http://localhost:8080/v1"
+      "base_url": "http://localhost:8081/v1"
     }
   },
   "local_models": {

@@ -24,6 +24,7 @@ MODULE_SUMMARIES = {
     'context_injection':        {'total': 12, 'successful': 2,  'failed': 10},
     'weight_manipulation':      {'total': 30, 'successful': 4,  'failed': 26},
     'multi_turn':               {'total': 3,  'successful': 0,  'failed': 3},
+    'new_attacks':             {'total': 5,  'successful': 2,  'failed': 3},
 }
 
 DEFENSE_TESTER = {
