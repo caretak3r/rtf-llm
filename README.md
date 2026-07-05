@@ -374,3 +374,10 @@ uv run python main.py --help
 # lock dependency graph
 uv lock
 ```
+
+## Running tests
+
+```bash
+uv sync --group dev
+uv run pytest -q
+```
