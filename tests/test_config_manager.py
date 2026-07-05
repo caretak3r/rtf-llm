@@ -23,8 +23,12 @@ def test_set_creates_nested_path(tmp_path):
 def test_get_llm_config_merges_provider_defaults(tmp_path):
     cfg = {
         "llm": {"provider": "openai", "model": "", "api_key": None, "base_url": None},
-        "providers": {"openai": {"default_model": "gpt-4o",
-                                  "base_url": "https://api.openai.com/v1"}},
+        "providers": {
+            "openai": {
+                "default_model": "gpt-4o",
+                "base_url": "https://api.openai.com/v1",
+            }
+        },
     }
     cm = _cm(tmp_path, cfg)
     merged = cm.get_llm_config()
