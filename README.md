@@ -375,6 +375,24 @@ uv run python main.py --help
 uv lock
 ```
 
+## Development
+
+Set up the dev environment:
+
+```bash
+uv sync --group dev
+```
+
+Run quality checks locally:
+
+```bash
+uv run ruff check .        # lint
+uv run ruff format --check .   # format check (use `uv run ruff format .` to apply)
+uv run mypy modules/ main.py   # type check
+```
+
+These same checks run automatically on every PR via `.github/workflows/quality.yml`.
+
 ## Running tests
 
 ```bash

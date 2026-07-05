@@ -16,3 +16,16 @@ This file is the project's committed home for project-intrinsic agent knowledge:
   functions/staticmethods directly instead of instantiating `LLMClient`.
 - If `LLMClient.chat` needs exercising in a future test, monkeypatch
   `requests.post` rather than hitting a live server.
+
+## Lint / format / typecheck
+
+- `requires-python` is `>=3.10` (not `3.14` — that version isn't released yet;
+  CI installs `3.12`). Keep the floor aligned with what CI actually runs.
+- `uv sync --group dev` also installs `ruff` and `mypy`. Run
+  `uv run ruff check .`, `uv run ruff format --check .`, and
+  `uv run mypy modules/ main.py` locally; the same three checks run in
+  `.github/workflows/quality.yml` on every push/PR to `main`.
+- As of this tooling's introduction, `ruff` and `mypy` report a large number
+  of pre-existing findings across `modules/` and the attack scripts. Fixing
+  those was explicitly out of scope for adding the tooling — treat them as
+  known follow-up work, not new regressions, unless you touched that code.
