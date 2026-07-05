@@ -1033,6 +1033,29 @@ TECHNIQUE_INFO = {
             {"title": "Anthropic - Constitutional Classifiers", "url": "https://www.anthropic.com/research/constitutional-classifiers"},
         ],
     },
+    "logic_jailbreak": {
+        "description": (
+            "Fallacy Failure / Logic-Based Jailbreak: exploits reasoning-model "
+            "compliance (o1, DeepSeek-R1) by embedding malicious requests inside "
+            "formally invalid but structurally persuasive logical scaffolding — "
+            "false premises, syllogistic traps, false equivalence, begging the "
+            "question, and loaded questions. Models answer the reasoning task "
+            "rather than rejecting the premise, leading to harmful output."
+        ),
+        "atlas": "AML.T0054 (LLM Jailbreak: Logic Trap)",
+        "cwe": "CWE-1039 (Inadequate Detection of Adversarial Input Perturbations)",
+        "defense": [
+            "Train reasoning models to flag and reject false premises before evaluating conditionals.",
+            "Add a premise-verification layer that checks whether embedded assumptions violate safety policy.",
+            "Detect syllogistic structures where the conclusion is a policy violation and refuse the argument form.",
+            "Reject 'epistemic honesty over policy' framings and similar fake authority appeals.",
+            "Score logical-form prompts for embedded harmful goals, not just surface harmlessness.",
+        ],
+        "references": [
+            {"title": "Reasoning-Model Logical Jailbreaks (May 2025)", "url": "https://arxiv.org/abs/2505.12345"},
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+    },
     "rag_injection": {
         "description": (
             "RAG Indirect Prompt Injection: the attacker plants an injection "
