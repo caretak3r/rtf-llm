@@ -347,7 +347,7 @@ class LLMClient:
             return response.json()
         except KeyboardInterrupt:
             raise
-        except (requests.exceptions.RequestException, ValueError) as e:
+        except (requests.exceptions.RequestException, ValueError):
             self.error_count += 1
             if attempt < self.max_retries:
                 wait = min(self.retry_base_delay * (2 ** attempt), self.retry_max_delay)
