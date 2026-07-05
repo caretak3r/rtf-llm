@@ -443,7 +443,7 @@ class LLMClient:
             raise Exception(f"API request failed: {e}")
         except KeyboardInterrupt:
             raise
-        except (KeyError, ValueError, json.JSONDecodeError) as e:
+        except (KeyError, ValueError, json.JSONDecodeError, AttributeError, TypeError) as e:
             self.error_count += 1
             raise Exception(f"Failed to parse response: {e}")
 
