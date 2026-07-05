@@ -466,11 +466,23 @@ def main():
         print(f"{Fore.GREEN}[+] Report saved to: {report_path}{Style.RESET_ALL}")
         
         # Print summary
-        total_attacks = sum(len(r['attacks']) for _, r in results)
-        successful = sum(sum(1 for a in r['attacks'] if a.get('success', False)) 
-                        for _, r in results)
-        canary_leaks = sum(sum(1 for a in r['attacks'] if a.get('canary_leaked', False))
-                           for _, r in results)
+        def _module_counts(r):
+            attacks = r.get('attacks') or []
+            if attacks:
+                total = len(attacks)
+                succ = sum(1 for a in attacks if a.get('success', False))
+                canary = sum(1 for a in attacks if a.get('canary_leaked', False))
+                return total, succ, canary
+            # Fall back to a summary block (comparison / lab-module shapes).
+            summary = r.get('summary', {})
+            total = summary.get('total', 0)
+            succ = summary.get('successful', 0)
+            return total, succ, 0
+
+        counts = [_module_counts(r) for _, r in results]
+        total_attacks = sum(c[0] for c in counts)
+        successful = sum(c[1] for c in counts)
+        canary_leaks = sum(c[2] for c in counts)
         print(f"\n{Fore.YELLOW}[*] Summary:{Style.RESET_ALL}")
         print(f"  Total attacks: {total_attacks}")
         print(f"  Successful: {Fore.RED}{successful}{Style.RESET_ALL}")
