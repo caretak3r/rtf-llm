@@ -447,6 +447,19 @@ TECHNIQUE_INFO = {
         ],
         "references": [],
     },
+    "tokenbreak": {
+        "description": "TokenBreak / Tokenization Confusion attacks (June 2025). Crafts inputs that appear benign to character-level filters but tokenize into subword sequences the model interprets as override instructions. Exploits BPE boundary splits, substitution-cipher token decoding, and repetition-induced merging.",
+        "atlas": "AML.T0054",
+        "cwe": "CWE-176",
+        "defense": [
+            "Run safety classifiers on the tokenized input (token IDs) in addition to raw text.",
+            "Use tokenizer-aware input normalization: reject prompts whose token sequence contains high-probability override subword n-grams.",
+            "Adopt a detokenization pass before safety filtering: compare raw text against reconstructed text and flag divergence.",
+            "Apply output filtering that catches canary tokens even when the input was obfuscated at the token level.",
+        ],
+        # TODO: update with final arXiv ID once the TokenBreak paper is published.
+        "references": [],
+    },
 
     # ---------------- Role Confusion ----------------
     "role_replacement": {
