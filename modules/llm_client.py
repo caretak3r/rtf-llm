@@ -345,7 +345,9 @@ class LLMClient:
                 return self._request_raw(url, headers, payload, attempt + 1)
             response.raise_for_status()
             return response.json()
-        except Exception as e:
+        except KeyboardInterrupt:
+            raise
+        except (requests.exceptions.RequestException, ValueError):
             self.error_count += 1
             if attempt < self.max_retries:
                 wait = min(self.retry_base_delay * (2 ** attempt), self.retry_max_delay)
@@ -439,7 +441,9 @@ class LLMClient:
         except requests.exceptions.RequestException as e:
             self.error_count += 1
             raise Exception(f"API request failed: {e}")
-        except Exception as e:
+        except KeyboardInterrupt:
+            raise
+        except (KeyError, ValueError, json.JSONDecodeError, AttributeError, TypeError) as e:
             self.error_count += 1
             raise Exception(f"Failed to parse response: {e}")
 
