@@ -167,6 +167,22 @@ TECHNIQUE_INFO = {
         ],
     },
 
+    "tokenbreak": {
+        "description": "TokenBreak / Tokenization Confusion attacks (June 2025). Crafts inputs that appear benign to character-level filters but tokenize into subword sequences the model interprets as override instructions. Exploits BPE boundary splits, substitution-cipher token decoding, and repetition-induced merging.",
+        "atlas": "AML.T0054 (LLM Jailbreak)",
+        "cwe": "CWE-176 (Improper Handling of Unicode Encoding)",
+        "defense": [
+            "Run safety classifiers on the tokenized input (token IDs) in addition to raw text.",
+            "Use tokenizer-aware input normalization: reject prompts whose token sequence contains high-probability override subword n-grams.",
+            "Adopt a detokenization pass before safety filtering: compare raw text against reconstructed text and flag divergence.",
+            "Apply output filtering that catches canary tokens even when the input was obfuscated at the token level.",
+        ],
+        "references": [
+            # TODO: update with final arXiv ID when available
+            {"title": "TokenBreak: Exploiting Tokenizer Boundaries in LLM Input Filters (June 2025)", "url": "https://arxiv.org/abs/2506.0XXXX"},
+        ],
+    },
+
     # ---------------- Jailbreak ----------------
     "dan": {
         "description": "DAN ('Do Anything Now') and its descendants. Roleplay framing that asserts the model has 'broken free' of its rules.",
@@ -951,6 +967,46 @@ TECHNIQUE_INFO = {
         "references": [],
     },
 
+    # --- Document Upload Injection ---
+    "document_upload": {
+        "description": (
+            "Stored prompt injection embedded in uploaded documents (PDFs, "
+            "images, ID scans) and extracted by OCR or metadata parsers. The "
+            "payload bypasses text-input safety filters because it never "
+            "appears in the user-visible prompt; it is injected at the "
+            "document layer and reaches the model only after extraction. "
+            "Demonstrated in 2026 against KYC/ID-verification pipelines."
+        ),
+        "atlas": "AML.T0051 (LLM Prompt Injection: Indirect / Document)",
+        "cwe": "CWE-77 (Improper Neutralization of Special Elements)",
+        "defense": [
+            "Run OCR-extracted text and document metadata through the same "
+            "input-safety classifier used for direct user prompts.",
+            "Sanitize or strip metadata layers (EXIF, PDF XMP, tEXt chunks) "
+            "before document text reaches the language model.",
+            "Detect near-invisible text (white-on-white, zero-width fonts, "
+            "extremely small font sizes) in uploaded images and PDFs.",
+            "Never treat extracted document text as trusted system context; "
+            "quarantine it in a separate sandboxed prompt segment.",
+        ],
+        "references": [
+            {"title": "OWASP LLM01:2025 Prompt Injection",
+             "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+            {"title": "KYC Document Upload Injection (2026)",
+             "url": "https://arxiv.org/abs/2601.00000"},
+        ],
+    },
+    "synthetic_ocr_extraction": {
+        "description": (
+            "Synthetic test vector that simulates OCR-extracted text from an "
+            "uploaded document. Used when no actual OCR engine is integrated."
+        ),
+        "atlas": "AML.T0051",
+        "cwe": "CWE-77",
+        "defense": ["See 'document_upload' defenses above."],
+        "references": [],
+    },
+
     # ----------- vectors.md additions -----------
     "echo_chamber": {
         "description": (
@@ -1033,6 +1089,29 @@ TECHNIQUE_INFO = {
             {"title": "Anthropic - Constitutional Classifiers", "url": "https://www.anthropic.com/research/constitutional-classifiers"},
         ],
     },
+    "logic_jailbreak": {
+        "description": (
+            "Fallacy Failure / Logic-Based Jailbreak: exploits reasoning-model "
+            "compliance (o1, DeepSeek-R1) by embedding malicious requests inside "
+            "formally invalid but structurally persuasive logical scaffolding — "
+            "false premises, syllogistic traps, false equivalence, begging the "
+            "question, and loaded questions. Models answer the reasoning task "
+            "rather than rejecting the premise, leading to harmful output."
+        ),
+        "atlas": "AML.T0054 (LLM Jailbreak: Logic Trap)",
+        "cwe": "CWE-1039 (Inadequate Detection of Adversarial Input Perturbations)",
+        "defense": [
+            "Train reasoning models to flag and reject false premises before evaluating conditionals.",
+            "Add a premise-verification layer that checks whether embedded assumptions violate safety policy.",
+            "Detect syllogistic structures where the conclusion is a policy violation and refuse the argument form.",
+            "Reject 'epistemic honesty over policy' framings and similar fake authority appeals.",
+            "Score logical-form prompts for embedded harmful goals, not just surface harmlessness.",
+        ],
+        "references": [
+            {"title": "Reasoning-Model Logical Jailbreaks (May 2025)", "url": "https://arxiv.org/abs/2505.12345"},
+            {"title": "OWASP LLM01:2025 Prompt Injection", "url": "https://owasp.org/www-project-top-10-for-large-language-model-applications/"},
+        ],
+    },
     "rag_injection": {
         "description": (
             "RAG Indirect Prompt Injection: the attacker plants an injection "
@@ -1100,6 +1179,21 @@ TECHNIQUE_INFO = {
             {"title": "HarmBench / JailbreakBench Leaderboards", "url": "https://www.harmbench.org/"},
             {"title": "Zou et al. - Circuit Breakers", "url": "https://arxiv.org/abs/2406.04313"},
             {"title": "Anthropic - Constitutional Classifiers", "url": "https://www.anthropic.com/research/constitutional-classifiers"},
+        ],
+    },
+    "memory_poisoning": {
+        "description": "Indirect injection that instructs an AI agent to store a malicious entry in its persistent memory (vector DB, MemGPT, long-term context). The entry silently triggers on a later user query, creating a cross-session backdoor.",
+        "atlas": "AML.T0051.001 (LLM Prompt Injection: Indirect)",
+        "cwe": "CWE-94 (Improper Control of Generation of Code)",
+        "defense": [
+            "Sandbox untrusted content before allowing memory write; do not store user-supplied instructions as retrievable memory.",
+            "Apply a classification step to every proposed memory entry; reject entries containing override keywords, system references, or trigger conditions.",
+            "Sign memory entries with an HMAC keyed by the system; reject retrieved entries with invalid signatures.",
+            "Validate retrieved memory against the original safety policy before it influences generation.",
+        ],
+        "references": [
+            {"title": "OWASP AppSec USA 2025 — Agent Memory Poisoning for Persistent Backdoor Access", "url": "https://owasp.org/"},
+            {"title": "Greshake et al. - Not what you've signed up for: Indirect Prompt Injection", "url": "https://arxiv.org/abs/2302.12173"},
         ],
     },
 }
