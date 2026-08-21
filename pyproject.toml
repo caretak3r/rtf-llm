@@ -41,7 +41,6 @@ extend-exclude = [
     "modules/data_exfiltration.py",
     "modules/data_extraction.py",
     "modules/defense_tester.py",
-    "modules/direct_attack.py",
     "modules/indirect_injection.py",
     "modules/jailbreak.py",
     "modules/multi_turn.py",

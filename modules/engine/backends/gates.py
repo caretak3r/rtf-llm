@@ -74,24 +74,3 @@ class StallDetector:
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self._stop.set()
-
-
-class HeartbeatStream:
-    """File-like shim that feeds a StallDetector on every write/read."""
-
-    def __init__(self, detector: StallDetector) -> None:
-        self._detector = detector
-
-    def write(self, data) -> int:
-        self._detector.beat()
-        return len(data)
-
-    def read(self, *args) -> bytes:
-        self._detector.beat()
-        return b""
-
-    def flush(self) -> None:
-        pass
-
-    def close(self) -> None:
-        pass

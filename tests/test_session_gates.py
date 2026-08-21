@@ -7,7 +7,6 @@ import pytest
 
 from modules.engine.backends.gates import (
     GateAborted,
-    HeartbeatStream,
     StallDetector,
     StallError,
     hard_stop_gate,
@@ -77,9 +76,3 @@ def test_stall_detector_no_stall_with_beats():
     assert detector.check() is None
 
 
-def test_heartbeat_stream_feeds_detector():
-    detector = StallDetector(5.0)
-    stream = HeartbeatStream(detector)
-    stream.write(b"data")
-    stream.read(4)
-    detector.check()

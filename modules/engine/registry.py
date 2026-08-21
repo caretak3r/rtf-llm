@@ -47,14 +47,8 @@ def _walk_package(package, package_name: str) -> None:
         if not is_pkg:
             try:
                 importlib.import_module(modname)
-            except ImportError:
-                pass
-
-
-def get_transform(transform_id: str) -> type[Transform]:
-    if transform_id not in TransformRegistryMeta.registry:
-        raise KeyError(f"Unknown transform: {transform_id!r}")
-    return TransformRegistryMeta.registry[transform_id]
+            except ImportError as exc:
+                print(f"[!] registry skipped {modname}: {exc}")
 
 
 def all_transforms() -> dict[str, type[Transform]]:

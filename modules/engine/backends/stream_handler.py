@@ -23,10 +23,16 @@ class StopReason(Enum):
 class RefusalPattern:
     pattern: re.Pattern[str]
     min_window: int = 64
+    # Original literal the pattern was built from, when known. SWALLOW's
+    # prefix-tolerant hold check needs the plain text; arbitrary regex
+    # patterns without a literal are only caught by the full-match abort.
+    literal: str = ""
 
     @classmethod
     def from_keywords(cls, keywords: list[str]) -> list[RefusalPattern]:
-        return [cls(re.compile(re.escape(k), re.IGNORECASE)) for k in keywords]
+        return [
+            cls(re.compile(re.escape(k), re.IGNORECASE), literal=k) for k in keywords
+        ]
 
 
 DEFAULT_REFUSAL_KEYWORDS = [
@@ -61,6 +67,9 @@ class RefusalAbortingStream:
         "_stats",
         "_aborted",
         "_completed",
+        "_pending",
+        "_hold_literals",
+        "_hold_window",
     )
 
     def __init__(
@@ -79,6 +88,10 @@ class RefusalAbortingStream:
         self._stats = HandlerStats()
         self._aborted = False
         self._completed = False
+        # SWALLOW state: tokens withheld while a refusal phrase is forming.
+        self._pending: list[str] = []
+        self._hold_literals = [p.literal.lower() for p in self._patterns if p.literal]
+        self._hold_window = max((len(k) for k in self._hold_literals), default=0)
 
     def __aiter__(self) -> AsyncIterator[str]:
         return self._run()
@@ -114,12 +127,26 @@ class RefusalAbortingStream:
                     return
 
                 if self._strategy is RefusalStrategy.SWALLOW:
-                    yield token
+                    if self._holding():
+                        # Refusal phrase actively forming: withhold until the
+                        # scan clears; never flushed if a refusal confirms.
+                        self._pending.append(token)
+                    else:
+                        for held in self._pending:
+                            self._stats.tokens_emitted += 1
+                            yield held
+                        self._pending.clear()
+                        self._stats.tokens_emitted += 1
+                        yield token
                 else:
                     self._stats.tokens_emitted += 1
                     yield token
 
             self._stats.stop_reason = StopReason.COMPLETED
+        except RefusalDetected:
+            # stop_reason is already REFUSAL_DETECTED; the blanket handler
+            # below must not mislabel an intentional abort as an upstream error.
+            raise
         except Exception:
             self._stats.stop_reason = StopReason.UPSTREAM_ERROR
             raise
@@ -135,6 +162,21 @@ class RefusalAbortingStream:
                 self._stats.matched_at_char = self._stats.chars_seen
                 return p
         return None
+
+    def _holding(self) -> bool:
+        """SWALLOW helper: True while the buffer tail could still complete
+        into one of the literal refusal phrases (case-insensitive, prefix-
+        tolerant). Patterns without a literal never trigger a hold; they are
+        still caught by the full-match abort in _scan."""
+        if not self._hold_literals:
+            return False
+        window = self._buffer[-self._hold_window :].lower()
+        return any(
+            kw in window or kw.startswith(suffix)
+            for kw in self._hold_literals
+            for suffix in (window[i:] for i in range(len(window)))
+            if suffix
+        )
 
     async def _handle_refusal(self, p: RefusalPattern) -> None:
         self._aborted = True

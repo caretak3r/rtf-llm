@@ -11,9 +11,26 @@ transform stays offline-testable. Swap in an LLM judge via ctx.config
 from __future__ import annotations
 
 from collections.abc import Callable
-
 from modules.engine.base import Transform, TransformContext, TransformResult
+from modules.engine.backends.stream_handler import DEFAULT_REFUSAL_KEYWORDS
 from modules.engine.registry import register_transform
+
+_REFUSAL_KEYWORDS = tuple(k.lower() for k in DEFAULT_REFUSAL_KEYWORDS)
+
+
+def _refusal_detected(ctx: TransformContext, response: str) -> bool:
+    """Plan 050 minimal wiring, mirroring adaptive/pair's detector fallback
+    chain: LLM goal judge when configured (engine.judge == "llm"), keyword
+    fallback otherwise."""
+    if (
+        (ctx.config or {}).get("engine", {}).get("judge") == "llm"
+        and ctx.target is not None
+    ):
+        from modules.engine.eval.llm_judge import LLMGoalJudge
+
+        return LLMGoalJudge(ctx.target, goal=ctx.input or "").classify(response)[0]
+    lowered = (response or "").lower()
+    return any(k in lowered for k in _REFUSAL_KEYWORDS)
 
 
 def _default_scorer(response: str) -> float:
@@ -65,10 +82,11 @@ class BestOfN(Transform):
         scores = [scorer(c) for c in candidates]
         idx = max(range(len(scores)), key=lambda i: scores[i])
         chosen = candidates[idx]
-
+        refusal_detected = _refusal_detected(ctx, chosen)
         return TransformResult(
             output=chosen,
-            bypassed=False,
+            bypassed=not refusal_detected,
+            refusal_detected=refusal_detected,
             metrics={
                 "n_samples": len(candidates),
                 "requested_samples": n,

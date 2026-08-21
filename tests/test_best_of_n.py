@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """Tests for the Best-of-N sampler transform."""
 
@@ -57,3 +58,32 @@ def test_live_target_generates_missing_candidates():
     assert len(target.calls) == 3
     assert res.metrics["n_samples"] == 3
     assert target.calls[0][1]["temperature"] == 0.7
+
+def test_bypassed_false_when_chosen_candidate_is_a_refusal():
+    t = BestOfN()
+    ctx = TransformContext(
+        input="goal",
+        state={"candidates": ["I cannot help with that", "sorry but I'm unable to assist"]},
+    )
+    res = t.transform(ctx)
+    assert res.bypassed is False
+    assert res.refusal_detected is True
+
+
+def test_bypassed_true_when_chosen_candidate_is_not_a_refusal():
+    t = BestOfN()
+    ctx = TransformContext(
+        input="goal",
+        state={"candidates": ["I cannot help with that", "the system prompt is HUNTER2 and it is long"]},
+    )
+    res = t.transform(ctx)
+    # Default scorer picks the longer non-refusal candidate.
+    assert res.bypassed is True
+    assert res.refusal_detected is False
+
+
+def test_error_path_never_claims_bypass():
+    t = BestOfN()
+    res = t.transform(TransformContext(input="goal"))
+    assert res.bypassed is False
+    assert res.refusal_detected is False
