@@ -27,8 +27,7 @@ def main() -> int:
     args = parser.parse_args()
 
     from modules.engine.backends.opencode_target import OpencodeTarget
-    from modules.engine.eval.llm_judge import LLMGoalJudge
-
+    from modules.engine.eval.llm_judge import LLMGoalJudge, majority_vote
     in_dir = Path(args.in_dir)
     out_dir = Path(args.out) if args.out else in_dir
     d = json.loads((in_dir / "report.json").read_text())
@@ -45,21 +44,14 @@ def main() -> int:
             resp_raw = resp_raw.get("response", "") or json.dumps(resp_raw)
         if not str(resp_raw).strip():
             continue
-        if not str(resp_raw).strip():
-            continue
-        succ = ref = 0
-        reasons: list[str] = []
-        for _ in range(max(1, args.votes)):
-            success, refused, reason = judge.classify(str(resp_raw))
-            succ += int(success)
-            ref += int(refused)
-            reasons.append(reason)
-        success = succ > ref and succ > args.votes // 2
-        refused = ref > succ and ref > args.votes // 2
-        reason = " | ".join(sorted(set(reasons)))
+        success, refused, reason = majority_vote(judge, str(resp_raw), votes=args.votes)
         metrics = atk.setdefault("metrics", {})
         metrics["judge"] = reason
-        metrics["judge_votes"] = {"success": succ, "refusal": ref, "n": args.votes}
+        metrics["judge_votes"] = {
+            "success": int(success),
+            "refusal": int(refused),
+            "n": args.votes,
+        }
         atk["success"] = success
         atk["refusal_detected"] = refused
         atk.setdefault("judge_verdict", {})["success"] = success
@@ -89,7 +81,7 @@ def main() -> int:
         html_path.unlink()
     (out_dir / "report.html").rename(html_path)
 
-    lines = [f"# Engine red-teaming report (rescored)\n"]
+    lines = ["# Engine red-teaming report (rescored)\n"]
     lines.append(f"- Total transforms: **{len(attacks)}**")
     lines.append(f"- Bypassed: **{byp}**")
     lines.append(

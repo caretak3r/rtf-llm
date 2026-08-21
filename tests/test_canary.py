@@ -7,6 +7,7 @@ from modules.engine.eval.canary import (
     POSITION_TOKEN,
     analyze_canary_position,
     apply_canary_veto,
+    apply_canary_veto_to_results,
     refusal_position,
 )
 
@@ -65,3 +66,47 @@ def test_veto_uses_reply_field_fallback():
     attacks = [{"canary_leaked": False, "reply": f"x {CANARY} y"}]
     result = apply_canary_veto(attacks, CANARY)
     assert len(result["accepted"]) == 1
+
+
+def test_veto_scans_artifacts_and_reply():
+    # Leak only in the reply while artifacts exist: reply must not be skipped.
+    attacks = [{"canary_leaked": False, "artifacts": ["tool output"], "reply": f"leak {CANARY}"}]
+    result = apply_canary_veto(attacks, CANARY)
+    assert len(result["accepted"]) == 1
+    assert result["accepted"][0]["canary_position"] == POSITION_POS0
+
+
+def test_veto_leak_only_in_artifacts_accepted():
+    attacks = [{"canary_leaked": False, "artifacts": [PADDING + CANARY], "reply": "refusal"}]
+    result = apply_canary_veto(attacks, CANARY)
+    assert len(result["accepted"]) == 1
+    assert result["accepted"][0]["canary_position"] == POSITION_TOKEN
+
+
+def test_veto_combined_results_covers_engine_rows_after_legacy():
+    """Veto runs over the FINAL combined list: engine rows (appended after
+    legacy modules) pass through the same ground-truth gate."""
+    results = [
+        (
+            "prompt-injection",
+            {"attacks": [{"canary_leaked": False, "artifacts": [], "reply": "no leak"}]},
+        ),
+        (
+            "engine",
+            {
+                "scope_name": "engine",
+                "attacks": [
+                    {"canary_leaked": False, "artifacts": [], "reply": f"got {CANARY}"},
+                    {"canary_leaked": False, "artifacts": [], "reply": "clean refusal"},
+                ],
+            },
+        ),
+    ]
+    vetoed_total = apply_canary_veto_to_results(results, CANARY)
+    assert vetoed_total == 2
+    legacy, engine = results[0][1], results[1][1]
+    assert len(legacy["attacks"]) == 0
+    assert legacy["canary_veto"]["vetoed"] == 1
+    assert len(engine["attacks"]) == 1
+    assert engine["canary_veto"]["vetoed"] == 1
+    assert engine["attacks"][0]["canary_position"] == POSITION_POS0

@@ -1017,28 +1017,6 @@ def main():
                 comp_result = runner.run_comparison()
                 results.append(("comparison", comp_result))
 
-        # Generate report
-        if args.canary_veto:
-            from modules.engine.eval.canary import apply_canary_veto
-
-            vetoed_total = 0
-            for idx, (module_name, module_results) in enumerate(results):
-                attacks = module_results.get("attacks") or []
-                if not attacks:
-                    continue
-                outcome = apply_canary_veto(attacks, getattr(llm_client, "canary_token", ""))
-                module_results["attacks"] = outcome["accepted"]
-                module_results["canary_veto"] = {
-                    "vetoed": outcome["vetoed"],
-                    "position_breakdown": outcome["position_breakdown"],
-                }
-                vetoed_total += outcome["vetoed"]
-            if vetoed_total:
-                print(
-                    f"{Fore.YELLOW}[!] Canary veto: excluded {vetoed_total} "
-                    f"judge-only finding(s) without ground-truth leaks{Style.RESET_ALL}"
-                )
-
         print(f"\n{Fore.CYAN}[*] Generating report...{Style.RESET_ALL}")
         llm_stats = llm_client.get_stats() if hasattr(llm_client, "get_stats") else None
 
@@ -1049,7 +1027,21 @@ def main():
             engine_report = consolidate(
                 list(pipelines), scopes=list(scopes), scope_ids=list(scope_ids)
             )
+
             results.append(("engine", to_standard_module(engine_report, scope_name="engine")))
+
+        # Generate report
+        if args.canary_veto:
+            from modules.engine.eval.canary import apply_canary_veto_to_results
+
+            vetoed_total = apply_canary_veto_to_results(
+                results, getattr(llm_client, "canary_token", "")
+            )
+            if vetoed_total:
+                print(
+                    f"{Fore.YELLOW}[!] Canary veto: excluded {vetoed_total} "
+                    f"judge-only finding(s) without ground-truth leaks{Style.RESET_ALL}"
+                )
 
         if results:
             if session is not None:
