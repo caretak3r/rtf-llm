@@ -62,3 +62,57 @@ def test_high_water_first_run(tmp_path):
     best, improved = check_high_water(None, 0.5)
     assert improved is True
     assert best == 0.5
+
+
+def test_resume_roundtrip_done_seeds(tmp_path):
+    store = CheckpointStore(tmp_path / "ckpt.json")
+    store.save(
+        "latest",
+        {"iteration": 3, "metric": 0.5, "seeds": 5, "done_seeds": [1, 2]},
+    )
+    assert store.resume("latest")["done_seeds"] == [1, 2]
+
+
+def test_corrupt_state_warns_and_returns_none(tmp_path, capsys):
+    p = tmp_path / "ckpt.json"
+    store = CheckpointStore(p)
+    store.save("latest", {"iteration": 1, "metric": 1, "seeds": 3})
+    p.write_text("{not json")
+    assert store.resume("latest") is None
+    assert "Checkpoint corrupted, starting fresh" in capsys.readouterr().out
+
+
+def test_remaining_seeds_math(tmp_path):
+    store = CheckpointStore(tmp_path / "ckpt.json")
+    assert list(store.remaining_seeds(None, 3)) == [1, 2, 3]
+    assert list(store.remaining_seeds({"done_seeds": [1, 2]}, 5)) == [3, 4, 5]
+
+
+def test_high_water_blocks_regression_overwrite(tmp_path):
+    store = CheckpointStore(tmp_path / "ckpt.json")
+    assert store.save("latest", {"metric": 8}) is True
+    assert store.save("latest", {"metric": 3}) is False
+    assert store.resume("latest")["metric"] == 8
+    assert store.save("latest", {"metric": 3}, force=True) is True
+    assert store.resume("latest")["metric"] == 3
+
+
+def test_interrupted_run_resumes_from_last_seed(tmp_path):
+    p = tmp_path / "ckpt.json"
+    store = CheckpointStore(p)
+    for seed, metric in ((1, 2), (2, 4)):
+        store.save(
+            "latest",
+            {
+                "iteration": seed,
+                "metric": metric,
+                "seeds": 4,
+                "done_seeds": [s for s in (1, 2) if s <= seed],
+            },
+            force=True,
+        )
+
+    # Simulated crash before seeds 3-4; a fresh process resumes.
+    resumed = CheckpointStore(p).resume("latest")
+    assert resumed["done_seeds"] == [1, 2]
+    assert list(CheckpointStore(p).remaining_seeds(resumed, 4)) == [3, 4]

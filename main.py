@@ -676,16 +676,19 @@ def main():
                 diversity_temp=args.diversity_temp,
             )
             checkpoint = None
+            resume_state = None
+            seed_iter = range(1, max(1, args.seeds) + 1)
             if args.checkpoint:
                 from modules.engine.backends.checkpoint import CheckpointStore
 
                 checkpoint = CheckpointStore(args.checkpoint)
-                resume = checkpoint.resume("latest")
-                if resume is not None:
+                resume_state = checkpoint.resume("latest")
+                seed_iter = checkpoint.remaining_seeds(resume_state, args.seeds)
+                if resume_state is not None:
                     print(
-                        f"{Fore.YELLOW}[*] Resuming run from checkpoint "
-                        f"(iteration {resume.get('iteration', '?')}, "
-                        f"high-water metric {resume.get('metric')}){Style.RESET_ALL}"
+                        f"{Fore.YELLOW}[*] Resuming: seeds {seed_iter.start}..{args.seeds}"
+                        f" remain (done: {resume_state.get('done_seeds') or []})"
+                        f"{Style.RESET_ALL}"
                     )
 
             if args.seeds > 10 and not args.force:
@@ -706,10 +709,15 @@ def main():
 
                 stall = StallDetector(args.stall_timeout)
                 stall.__enter__()
-
             outcomes = []
+            completed_seeds: list[int] = []
+            best_metric = (
+                int(resume_state["metric"])
+                if resume_state and isinstance(resume_state.get("metric"), (int, float))
+                else 0
+            )
             try:
-                for seed in range(1, max(1, args.seeds) + 1):
+                for seed in seed_iter:
                     if stall is not None:
                         stall.beat()
                     seed_ctx = TransformContext(
@@ -734,23 +742,30 @@ def main():
                                     f"{seed:03d}_{tid.replace('/', '_')}.txt",
                                     str(artifact),
                                 )
+                    completed_seeds.append(seed)
+                    if checkpoint is not None:
+                        best_metric = max(
+                            best_metric,
+                            sum(1 for r in outcomes[-1][1].results if r.bypassed),
+                        )
+                        if not checkpoint.save(
+                            "latest",
+                            {
+                                "iteration": seed,
+                                "metric": best_metric,
+                                "seeds": args.seeds,
+                                "done_seeds": completed_seeds,
+                            },
+                            force=args.force,
+                        ):
+                            print(
+                                f"{Fore.YELLOW}[!] Stored high-water metric exceeds current"
+                                f" {best_metric}; checkpoint not overwritten"
+                                f" (use --force to override){Style.RESET_ALL}"
+                            )
             finally:
                 if stall is not None:
                     stall.__exit__(None, None, None)
-
-            if checkpoint is not None:
-                metric = max(
-                    (sum(1 for r in out.results if r.bypassed) for _, out in outcomes),
-                    default=0,
-                )
-                checkpoint.save(
-                    "latest",
-                    {"iteration": len(outcomes), "metric": metric, "seeds": args.seeds},
-                )
-                print(
-                    f"{Fore.GREEN}[+] Checkpoint saved: {args.checkpoint} "
-                    f"(iterations={len(outcomes)}, high-water metric={metric}){Style.RESET_ALL}"
-                )
 
             run_id = f"run-{int(time.time())}"
             outcome = outcomes[-1][1] if outcomes else None
