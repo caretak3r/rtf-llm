@@ -116,20 +116,20 @@ in an excluded script (044).
 | 37 | [037-rescope-weight-manipulation-extraction.md](037-rescope-weight-manipulation-extraction.md) | extraction is all asks; no logprob probing | L | 029 (separate half) | TODO |
 | 38 | [038-adaptive-multi-turn-flows.md](038-adaptive-multi-turn-flows.md) | multi-turn flows are hardcoded, non-adaptive | L | — | TODO |
 | 39 | [039-delete-or-repurpose-orphan-lab-modules.md](039-delete-or-repurpose-orphan-lab-modules.md) | 5 lab modules off-topic/stub, zero KB | S/M | — | TODO |
-| 40 | [040-campaign-report-integrity.md](040-campaign-report-integrity.md) | Campaign shuffle misattributes techniques + last-seed data loss | S | land before 045 | TODO |
-| 41 | [041-pages-exposure-triage.md](041-pages-exposure-triage.md) | Public Pages site publishes transcripts w/ operator paths | S/M | maintainer decision in Step 4 | TODO |
-| 42 | [042-engine-live-cli-wiring.md](042-engine-live-cli-wiring.md) | `engine.live` unreachable via CLI; T10/T11 provider choices | S | land before 045/046/047 | TODO |
-| 43 | [043-campaign-canary-ground-truth.md](043-campaign-canary-ground-truth.md) | Canary ground truth structurally dead in campaigns | M | 041 | TODO |
-| 44 | [044-scoring-spine-llm-judge.md](044-scoring-spine-llm-judge.md) | Judge untested; vote-majority duplicated; veto scope wrong | S/M | before 052 | TODO |
-| 45 | [045-checkpoint-resume-real.md](045-checkpoint-resume-real.md) | Resume resumes nothing; high-water never blocks overwrite | M | 040, 042 | TODO |
-| 46 | [046-pipeline-error-isolation.md](046-pipeline-error-isolation.md) | One transform exception destroys the run; no partial report | S/M | coordinate main.py tail | TODO |
-| 47 | [047-transform-construction-contract.md](047-transform-construction-contract.md) | TypeError-probing construction; `--pair-turns` ignored; rerank ties | S | coordinate with 040/042 | TODO |
-| 48 | [048-architecture-decision-memo.md](048-architecture-decision-memo.md) | ADR: campaign-as-product vs freeze-the-engine | M | gates 050 wire choices + legacy-side plans | TODO |
-| 49 | [049-engine-seam-test-baseline.md](049-engine-seam-test-baseline.md) | Engine seams untested; no root conftest (relocation-fragile) | M | before 050 | TODO |
-| 50 | [050-dead-surface-sweep.md](050-dead-surface-sweep.md) | SWALLOW no-op; bypassed hardcoded False; orphaned backends | S/M | 049 first; 048 informs WIRE choices | TODO |
-| 51 | [051-live-agent-blast-radius.md](051-live-agent-blast-radius.md) | `$HOME` workdir default; droid unsafe flag ungated | S | coordinate with 043 | TODO |
-| 52 | [052-small-hardening-bundle.md](052-small-hardening-bundle.md) | mitm cleartext upstream; silent registry skips; rescore hardcode | S | 044 first | TODO |
-| 53 | [053-packaging-portability.md](053-packaging-portability.md) | Console script cwd-bound; packages.find drift | M | 005 for wheel-content item | TODO |
+| 40 | [040-campaign-report-integrity.md](040-campaign-report-integrity.md) | Campaign shuffle misattributes techniques + last-seed data loss | S | land before 045 | **DONE** `53af86b` |
+| 41 | [041-pages-exposure-triage.md](041-pages-exposure-triage.md) | Public Pages site publishes transcripts w/ operator paths | S/M | maintainer decision in Step 4 | **DONE** `a06632b` (Step 4 history/Pages decision still open for maintainer; untracking rode in `53af86b`) |
+| 42 | [042-engine-live-cli-wiring.md](042-engine-live-cli-wiring.md) | `engine.live` unreachable via CLI; T10/T11 provider choices | S | land before 045/046/047 | **DONE** `7676338` |
+| 43 | [043-campaign-canary-ground-truth.md](043-campaign-canary-ground-truth.md) | Canary ground truth structurally dead in campaigns | M | 041 | **DONE** `d0bb4e7` (scratch naming follows 051's scheme; veto flag deferred until needed) |
+| 44 | [044-scoring-spine-llm-judge.md](044-scoring-spine-llm-judge.md) | Judge untested; vote-majority duplicated; veto scope wrong | S/M | before 052 | **DONE** `fcf6e87` |
+| 45 | [045-checkpoint-resume-real.md](045-checkpoint-resume-real.md) | Resume resumes nothing; high-water never blocks overwrite | M | 040, 042 | **DONE** `86a028d` (JSON-backed store, not the plan's SQLite sketch — semantics preserved on real API) |
+| 46 | [046-pipeline-error-isolation.md](046-pipeline-error-isolation.md) | One transform exception destroys the run; no partial report | S/M | coordinate main.py tail | **DONE** `d6aba95` |
+| 47 | [047-transform-construction-contract.md](047-transform-construction-contract.md) | TypeError-probing construction; `--pair-turns` ignored; rerank ties | S | coordinate with 040/042 | **DONE** `18034f3` (signature-inspecting helper per plan's alternative) |
+| 48 | [048-architecture-decision-memo.md](048-architecture-decision-memo.md) | ADR: campaign-as-product vs freeze-the-engine | M | gates 050 wire choices + legacy-side plans | **DONE** `826ed02` — DECISION PENDING, see plans/decisions/ADR-001-campaign-vs-freeze.md |
+| 49 | [049-engine-seam-test-baseline.md](049-engine-seam-test-baseline.md) | Engine seams untested; no root conftest (relocation-fragile) | M | before 050 | **DONE** `23e476a` (34 tests; opencode `_extract` API corrected vs plan draft) |
+| 50 | [050-dead-surface-sweep.md](050-dead-surface-sweep.md) | SWALLOW no-op; bypassed hardcoded False; orphaned backends | S/M | 049 first; 048 informs WIRE choices | **DONE** `63ba07a` (rerank item → landed with 047; HeartbeatStream was in gates.py, not llm_client.py) |
+| 51 | [051-live-agent-blast-radius.md](051-live-agent-blast-radius.md) | `$HOME` workdir default; droid unsafe flag ungated | S | coordinate with 043 | **DONE** `d0bb4e7` |
+| 52 | [052-small-hardening-bundle.md](052-small-hardening-bundle.md) | mitm cleartext upstream; silent registry skips; rescore hardcode | S | 044 first | **DONE** `8715cbb` (registry warn item already satisfied by 050's sweep) |
+| 53 | [053-packaging-portability.md](053-packaging-portability.md) | Console script cwd-bound; packages.find drift | M | 005 for wheel-content item | **DONE** `3c16aaf` (wheel-content item SKIPPED — assumes 005, not yet landed) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -246,6 +246,17 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
   currently shipped in the wheel); otherwise independent.
 - **Suite baseline**: 153 passed at `a6a9a9d`. Every run-4 plan must keep
   the suite green; each carries its own verification commands.
+
+**Run 4 execution (2026-08-21, branch `advisor/run-4-execution`):** all 14
+plans executed in 7 waves via parallel agents with disjoint file ownership
+(main.py owners strictly serialized per the rules above). Suite went
+153 → 250 passing; ruff clean at every integration point. One commit per
+plan (hashes in the table). Notables: 041's untracked-artifact deletions
+landed inside `53af86b` (040's commit) due to index staging order — outcome
+correct, attribution approximate. 050's rerank item and 052's registry item
+were satisfied by earlier waves and skipped to avoid double work. Still
+open for the maintainer: 041 Step 4 (history rewrite / Pages redeploy vs
+accept exposure) and the ADR-001 decision.
 
 ## Findings considered and rejected (do not re-audit)
 
