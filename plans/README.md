@@ -56,11 +56,28 @@ freshness, depth, and dead-content findings; direction work (new OWASP
 categories, best-of-N/PAIR, membership inference) is noted as follow-up, not
 planned here.
 
+### Run 4 (2026-08-21) — full-audit re-run post engine build
+
+A full re-audit at commit `a6a9a9d` (repo since moved into `red-teaming/`;
+.venv recreated during the audit after relocation broke the pytest entry
+point — see reconciliation below). The audit mapped the dual-stack reality
+(legacy dispatch chain vs `modules/engine`, campaign runner as the only
+engine-native consumer) and surfaced 14 findings. The user selected **all
+14** for planning (plans 040–053).
+
+Headlines: campaign reports attach results to the wrong technique under the
+default shuffle (040); the public Pages site carries transcripts with
+operator home paths (041); `engine.live` is unreachable via CLI so most of
+the engine fires inert (042); canary ground truth is structurally absent
+from campaigns (043); the scoring judge is untested with vote logic living
+in an excluded script (044).
+
+
 ## Execution order & status
 
 | Order | Plan | Finding | Effort | Depends on | Status |
 |-------|------|---------|--------|-----------|--------|
-| 1 | [001-test-baseline.md](001-test-baseline.md) | No verification baseline | M | — | TODO |
+| 1 | [001-test-baseline.md](001-test-baseline.md) | No verification baseline | M | — | **DONE** (reconciled run 4 — 21 test files, 153 passing; residual seams → 049) |
 | 2 | [002-fix-summary-keyerror.md](002-fix-summary-keyerror.md) | `KeyError: 'attacks'` crash | S | — (test added by 001 if present) | TODO |
 | 3 | [003-dashboard-localhost-bind.md](003-dashboard-localhost-bind.md) | Dashboard binds `0.0.0.0` | S | — | TODO (still open — confirmed) |
 | 4 | [004-wire-or-remove-config-flags.md](004-wire-or-remove-config-flags.md) | Dead config keys | S | — | TODO |
@@ -77,10 +94,10 @@ planned here.
 | 15 | [015-drop-unused-cryptography-dep.md](015-drop-unused-cryptography-dep.md) | Dead `cryptography` dependency | S | — | TODO |
 | 16 | [016-intensity-gating-all-modules.md](016-intensity-gating-all-modules.md) | `--intensity` cosmetic in 8/10 modules | M | 001 (test only) | TODO |
 | 17 | [017-save-config-atomic-write-key-stripping.md](017-save-config-atomic-write-key-stripping.md) | save_config unsafe write + incomplete key strip | S | — | TODO |
-| 18 | [018-pytest-ci-gate-quality-workflow.md](018-pytest-ci-gate-quality-workflow.md) | No pytest CI gate | S | 001 | TODO |
+| 18 | [018-pytest-ci-gate-quality-workflow.md](018-pytest-ci-gate-quality-workflow.md) | No pytest CI gate | S | 001 | **DONE** (reconciled run 4 — quality.yml runs ruff/format/pytest) |
 | 19 | [019-agents-md-executor-handoffs.md](019-agents-md-executor-handoffs.md) | No repo-level AGENTS.md | S | — | TODO |
 | 20 | [020-fix-request-raw-retry-retry-after.md](020-fix-request-raw-retry-retry-after.md) | `_request_raw` over-retries 4xx + Retry-After parse | S | — | TODO |
-| 21 | [021-ruff-mypy-pytest-config-sections.md](021-ruff-mypy-pytest-config-sections.md) | No `[tool.ruff]`/`[tool.mypy]`/`[tool.pytest]` config | S | — | TODO |
+| 21 | [021-ruff-mypy-pytest-config-sections.md](021-ruff-mypy-pytest-config-sections.md) | No `[tool.ruff]`/`[tool.mypy]`/`[tool.pytest]` config | S | — | **PARTIAL** (ruff+pytest sections exist; `[tool.mypy]` still missing) |
 | 22 | [022-reuse-requests-session-llm-calls.md](022-reuse-requests-session-llm-calls.md) | No requests.Session reuse | S | land after 020 | TODO |
 | 23 | [023-reconcile-usage-md-uv-rtf-cli.md](023-reconcile-usage-md-uv-rtf-cli.md) | USAGE.md contradicts README + tooling | S | — | TODO |
 | 24 | [024-restrict-dashboard-to-report-file.md](024-restrict-dashboard-to-report-file.md) | Dashboard serves whole report_dir incl. log | S | complements 003 | TODO |
@@ -99,6 +116,20 @@ planned here.
 | 37 | [037-rescope-weight-manipulation-extraction.md](037-rescope-weight-manipulation-extraction.md) | extraction is all asks; no logprob probing | L | 029 (separate half) | TODO |
 | 38 | [038-adaptive-multi-turn-flows.md](038-adaptive-multi-turn-flows.md) | multi-turn flows are hardcoded, non-adaptive | L | — | TODO |
 | 39 | [039-delete-or-repurpose-orphan-lab-modules.md](039-delete-or-repurpose-orphan-lab-modules.md) | 5 lab modules off-topic/stub, zero KB | S/M | — | TODO |
+| 40 | [040-campaign-report-integrity.md](040-campaign-report-integrity.md) | Campaign shuffle misattributes techniques + last-seed data loss | S | land before 045 | TODO |
+| 41 | [041-pages-exposure-triage.md](041-pages-exposure-triage.md) | Public Pages site publishes transcripts w/ operator paths | S/M | maintainer decision in Step 4 | TODO |
+| 42 | [042-engine-live-cli-wiring.md](042-engine-live-cli-wiring.md) | `engine.live` unreachable via CLI; T10/T11 provider choices | S | land before 045/046/047 | TODO |
+| 43 | [043-campaign-canary-ground-truth.md](043-campaign-canary-ground-truth.md) | Canary ground truth structurally dead in campaigns | M | 041 | TODO |
+| 44 | [044-scoring-spine-llm-judge.md](044-scoring-spine-llm-judge.md) | Judge untested; vote-majority duplicated; veto scope wrong | S/M | before 052 | TODO |
+| 45 | [045-checkpoint-resume-real.md](045-checkpoint-resume-real.md) | Resume resumes nothing; high-water never blocks overwrite | M | 040, 042 | TODO |
+| 46 | [046-pipeline-error-isolation.md](046-pipeline-error-isolation.md) | One transform exception destroys the run; no partial report | S/M | coordinate main.py tail | TODO |
+| 47 | [047-transform-construction-contract.md](047-transform-construction-contract.md) | TypeError-probing construction; `--pair-turns` ignored; rerank ties | S | coordinate with 040/042 | TODO |
+| 48 | [048-architecture-decision-memo.md](048-architecture-decision-memo.md) | ADR: campaign-as-product vs freeze-the-engine | M | gates 050 wire choices + legacy-side plans | TODO |
+| 49 | [049-engine-seam-test-baseline.md](049-engine-seam-test-baseline.md) | Engine seams untested; no root conftest (relocation-fragile) | M | before 050 | TODO |
+| 50 | [050-dead-surface-sweep.md](050-dead-surface-sweep.md) | SWALLOW no-op; bypassed hardcoded False; orphaned backends | S/M | 049 first; 048 informs WIRE choices | TODO |
+| 51 | [051-live-agent-blast-radius.md](051-live-agent-blast-radius.md) | `$HOME` workdir default; droid unsafe flag ungated | S | coordinate with 043 | TODO |
+| 52 | [052-small-hardening-bundle.md](052-small-hardening-bundle.md) | mitm cleartext upstream; silent registry skips; rescore hardcode | S | 044 first | TODO |
+| 53 | [053-packaging-portability.md](053-packaging-portability.md) | Console script cwd-bound; packages.find drift | M | 005 for wheel-content item | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -114,6 +145,36 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - **Plan 003 → still OPEN**: `main.py:65` `serve_dashboard(host='0.0.0.0', ...)`.
   Default still `0.0.0.0`. Not stale; still actionable. Plan 024 complements it
   (restricts *what* is served, independent of the bind).
+
+### Run 4 (2026-08-21, commit `a6a9a9d`)
+
+- **Plan 001 → DONE on disk**: `tests/` holds 21 files (153 tests passing);
+  CI runs pytest. The remaining coverage gap (engine seams) is re-scoped as
+  plan 049.
+- **Plan 018 → DONE on disk**: `.github/workflows/quality.yml` runs
+  `ruff check`, `ruff format --check`, and `pytest`.
+- **Plan 021 → PARTIAL**: `[tool.ruff]` and `[tool.pytest.ini_options]`
+  exist in `pyproject.toml`; `[tool.mypy]` still absent (ad-hoc mypy over
+  `modules/engine` + `main.py`: ~295 errors, unconfigured). Remaining scope:
+  the mypy section only.
+- **Plan 003 → still OPEN** (re-confirmed): dashboard bind default
+  unchanged.
+- **Run-1 unplanned item "auto-publish engagement output" → now PLANNED as
+  041**; remove from the backlog list above.
+- **Correction to "committed docs/reports is by-design"**: the clearance
+  covered sweep reports as intentional Pages source. Run 4 revised this:
+  git-tracked `opencode_campaign/` transcripts contain absolute operator
+  paths, reports embed `target_system_prompt`/`canary_token`, and the Pages
+  site was verified PUBLIC (`gh api repos/caretak3r/rtf-llm/pages` →
+  `public: true`). Finding planned as 041.
+- **Environment fact**: the checkout moved into `red-teaming/`;
+  `.venv/bin/pytest`'s shebang pointed at the old path so `uv run pytest`
+  silently fell through to Homebrew Python 3.14 (21 bogus collection
+  errors). Fixed during the audit by recreating `.venv`. Root conftest
+  bootstrap planned as part of 049.
+- **Provenance reality**: `rtf.db` runs/findings tables have 0 rows ever —
+  CLI engine mode never completed a recorded run. Motivates 042/045; the
+  scheduled regression-harness direction item remains unplanned.
 
 ## Dependency notes
 
@@ -168,6 +229,24 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
   `pycryptodome` may become unused — a plan-015-style follow-up can drop it.
   Don't auto-bundle; the maintainer may want pycryptodome for a future crypto module.
 
+**Run 4 (plans 040–053):**
+- **P0 trio lands first, independently**: 040 (report integrity), 041
+  (exposure triage), 042 (live wiring). No interdependencies.
+- **main.py engine block is serialized**: 040 → 042 → 045 → 046 → 047 all
+  rewrite adjacent regions of the same block. Never run two of them in
+  parallel; each plan's excerpts assume the previous one landed.
+- **044 before 052**: rescore imports `majority_vote` from its new home in
+  `eval/llm_judge.py`.
+- **049 before 050**: the deletion/wire sweep needs seam tests as its
+  safety net. **048 before any WIRE choice in 050** and before further
+  investment in legacy-side plans (016, 033–039).
+- **043 and 051 share the `--workdir` flag**: land together or strictly
+  sequentially; both touch the same parser block.
+- **053's wheel-content item assumes 005 landed** (deletes the dead module
+  currently shipped in the wheel); otherwise independent.
+- **Suite baseline**: 153 passed at `a6a9a9d`. Every run-4 plan must keep
+  the suite green; each carries its own verification commands.
+
 ## Findings considered and rejected (do not re-audit)
 
 ### Cleared as by-design / not-a-finding
@@ -192,7 +271,10 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
   `report_dir` is plan 024 — a real, low-severity finding.)
 - **Committed build artifacts** — none; `__pycache__`/`*.pyc`/`build/`/`egg-info`/
   `.ruff_cache`/`_site`/`.venv` all gitignored. Committed `docs/reports/` (37 files)
-  is by-design (Pages source).
+  is by-design (Pages source). **Revision (run 4):** that clearance covered
+  sweep reports as intended Pages content; tracked `opencode_campaign/`
+  transcripts with operator paths + embedded system-prompt/canary metadata
+  are a real finding — plan 041 — and the Pages site is verified public.
 - **Circular imports** — none; `modules/__init__.py` is comment-only;
   `llm_client.py` + `config_manager.py` import zero sibling modules.
 - **Secret stdout logging** — none; `llm_client.py` prints only status codes, never
@@ -200,9 +282,10 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ### Already-planned (do not re-report)
 
-- Plans 001–012 (above) and the run-1 unplanned items (auto-publish engagement
-  output, `BaseAttackModule` extraction, unified module registry, sweep concurrency,
-  vendored `install.sh`, god-file split).
+- Plans 001–012 (above) and the run-1 unplanned items (`BaseAttackModule`
+  extraction, unified module registry, sweep concurrency, vendored
+  `install.sh`, god-file split). Run 4 planned the previously-unplanned
+  auto-publish item as 041.
 
 ### Rejected as not-worth-doing (run 2)
 
