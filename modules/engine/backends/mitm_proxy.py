@@ -25,10 +25,17 @@ class MITMProxy:
         port: int = 0,
         request_hook=None,
         response_hook=None,
+        allow_insecure_upstream: bool = False,
     ) -> None:
+        """allow_insecure_upstream=False (default) makes the proxy refuse to
+        forward an https request to a cleartext http upstream (502) instead of
+        silently downgrading the connection — bearer tokens traversing the
+        proxy must not hit the network unencrypted by accident. Only set it
+        for loopback-only lab setups."""
         self._upstream = urlparse(upstream_url)
         self._request_hook = request_hook
         self._response_hook = response_hook
+        self._allow_insecure_upstream = allow_insecure_upstream
         self._shared = {"requests": [], "responses": []}
         self._server = ThreadingHTTPServer((host, port), self._handler_factory())
         self.port = self._server.server_address[1]
@@ -57,14 +64,35 @@ class MITMProxy:
                     payload = json.loads(body) if body else None
                 except ValueError:
                     payload = None
-
+                upstream = proxy._upstream
+                if "://" in self.path:
+                    req_scheme = self.path.split("://", 1)[0].lower()
+                else:
+                    req_scheme = self.headers.get("X-Forwarded-Proto", "http").lower()
+                if (
+                    req_scheme == "https"
+                    and upstream.scheme != "https"
+                    and not proxy._allow_insecure_upstream
+                ):
+                    self.send_response(502)
+                    self.end_headers()
+                    self.wfile.write(
+                        b"mitm proxy: refusing to forward an https request to a "
+                        b"cleartext http upstream; construct MITMProxy with "
+                        b"allow_insecure_upstream=True to override"
+                    )
+                    return
+                conn_cls = (
+                    http.client.HTTPSConnection
+                    if upstream.scheme == "https"
+                    else http.client.HTTPConnection
+                )
                 if payload is not None and proxy._request_hook:
                     payload = proxy._request_hook(payload)
                     body = json.dumps(payload).encode()
 
-                upstream = proxy._upstream
-                conn = http.client.HTTPConnection(upstream.netloc, timeout=30)
                 path = upstream.path or "/"
+                conn = conn_cls(upstream.netloc, timeout=30)
                 headers = {
                     k: v
                     for k, v in self.headers.items()
