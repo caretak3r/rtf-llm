@@ -200,6 +200,12 @@ def main():
         help="Run the engine pipeline N times with distinct seeds, checkpointing each",
     )
     parser.add_argument(
+        "--pair-turns",
+        type=int,
+        default=3,
+        help="PAIR refinement turns (budget cap, engine adaptive/pair)",
+    )
+    parser.add_argument(
         "--session",
         metavar="LABEL",
         help="Write run artifacts into an isolated session_<ts>_<label>/ tree",
@@ -637,7 +643,7 @@ def main():
                 engine_pipelines.append((f"dataset:{row['id']}", requested, pipeline_result))
 
         if args.engine:
-            from modules.engine.registry import all_transforms, discover_transforms
+            from modules.engine.registry import all_transforms, construct_transform, discover_transforms
             from modules.engine.base import TransformContext
             from modules.engine.pipeline import Pipeline
 
@@ -665,14 +671,11 @@ def main():
             for tid in requested:
                 cls = registry[tid]
                 try:
-                    transforms.append(cls())
-                except TypeError:
-                    try:
-                        transforms.append(cls(client=llm_client, config=config))
-                    except Exception as e:  # noqa: BLE001
-                        print(
-                            f"{Fore.YELLOW}[!] Could not build transform {tid}: {e}{Style.RESET_ALL}"
+                    transforms.append(
+                        construct_transform(
+                            cls, client=llm_client, config=config, max_turns=args.pair_turns
                         )
+                    )
                 except Exception as e:  # noqa: BLE001
                     print(f"{Fore.YELLOW}[!] Could not build transform {tid}: {e}{Style.RESET_ALL}")
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 import pkgutil
 from typing import TYPE_CHECKING
 
@@ -53,3 +54,20 @@ def _walk_package(package, package_name: str) -> None:
 
 def all_transforms() -> dict[str, type[Transform]]:
     return dict(TransformRegistryMeta.registry)
+
+
+def construct_transform(cls: type, **available: object) -> object:
+    """Build a transform, passing only the kwargs its __init__ accepts.
+
+    Transforms whose signature doesn't overlap `available` are constructed
+    bare; anything else gets the intersection of its signature and
+    `available`. A TypeError raised inside the constructor body propagates
+    (it is a bug, not a "needs kwargs" signal).
+    """
+    init = cls.__init__
+    if init is object.__init__:  # no declared __init__ anywhere -> bare construction
+        return cls()
+    params = inspect.signature(init).parameters
+    accepts_any = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values())
+    kwargs = {k: v for k, v in available.items() if k in params or accepts_any}
+    return cls(**kwargs)

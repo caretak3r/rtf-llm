@@ -37,6 +37,12 @@ def test_rerank_drops_failures_and_front_loads_winners():
     assert order == ["jailbreak/classic"]
 
 
+def test_rerank_ties_order_by_id_without_typeerror():
+    router = SemanticRouter([TechniqueProfile("b/y"), TechniqueProfile("a/x")])
+    router.embedder = lambda profile_id, query: 0.5
+    assert router.rerank("anything", failures=set(), winners=set(), k=2) == ["a/x", "b/y"]
+
+
 def test_embedder_hook_overrides_lexical():
     router = make_router(["a/x", "b/y"])
     router.embedder = lambda profile_id, query: 1.0 if profile_id == "b/y" else 0.0

@@ -168,7 +168,11 @@ def main() -> int:
 
     from modules.engine.backends.opencode_target import OpencodeTarget
     from modules.engine.kb.atlas import render_coverage_table, validate_kb
-    from modules.engine.registry import all_transforms, discover_transforms
+    from modules.engine.registry import (
+        all_transforms,
+        construct_transform,
+        discover_transforms,
+    )
     from modules.engine.report import consolidate, render_json, render_markdown, to_standard_module
 
     discover_transforms()
@@ -178,11 +182,11 @@ def main() -> int:
 
     transforms = []
     for tid in ids:
-        cls = registry[tid]
-        try:
-            transforms.append(cls())
-        except TypeError:
-            transforms.append(cls(intensity=args.legacy_intensity, max_turns=args.pair_turns))
+        transforms.append(
+            construct_transform(
+                registry[tid], intensity=args.legacy_intensity, max_turns=args.pair_turns
+            )
+        )
 
     by_id = dict(zip(ids, transforms))
     goals = _goals_arg(args.goals)

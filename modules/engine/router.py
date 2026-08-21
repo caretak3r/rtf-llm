@@ -57,7 +57,12 @@ class SemanticRouter:
     def rerank(self, query: str, failures: set[str], winners: set[str], k: int) -> list[str]:
         """Adaptive: drop failed profiles, front-load winning ones, keep score order."""
         keep = [p for p in self.profiles if p.id not in failures]
-        ranked = [p.id for _, p in sorted(((self._score(p, query), p) for p in keep), reverse=True)]
+        ranked = [
+            pid
+            for _, pid in sorted(
+                ((self._score(p, query), p.id) for p in keep), key=lambda t: (-t[0], t[1])
+            )
+        ]
         front = [pid for pid in ranked if pid in winners]
         rest = [pid for pid in ranked if pid not in winners]
         return (front + rest)[:k]
