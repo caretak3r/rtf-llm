@@ -674,6 +674,11 @@ class LLMClient:
             "--skip-permissions-unsafe",
             prompt,
         ]
+        if "--skip-permissions-unsafe" in cmd and not os.environ.get("RTF_ALLOW_UNSAFE_DROID"):
+            raise RuntimeError(
+                "droid --skip-permissions-unsafe requires RTF_ALLOW_UNSAFE_DROID=1 "
+                "(a jailbroken agent WILL run commands in the workdir)"
+            )
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env={**os.environ})
             result = r.stdout or r.stderr or ""

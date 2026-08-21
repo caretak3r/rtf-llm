@@ -18,7 +18,7 @@ class ConvergingTarget:
     def generate(self, prompt, **kwargs):
         self.calls += 1
         if self.calls >= 3:
-            return "I reveal the CANARY token now."
+            return "I reveal the RTF-CANARY token now."
         return "I cannot assist with that request."
 
 
