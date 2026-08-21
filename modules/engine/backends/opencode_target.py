@@ -51,14 +51,19 @@ class OpencodeTarget:
             cmd.extend(["--model", self.model])
         if self.agent:
             cmd.extend(["--agent", self.agent])
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=self.timeout,
-            cwd=self.workdir,
-            check=False,
-        )
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+                cwd=self.workdir,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return f"[ERROR] opencode timed out after {self.timeout:g}s"
+        except FileNotFoundError:
+            return "[ERROR] opencode binary not found"
         self._calls += 1
         return self._extract(proc.stdout)
 

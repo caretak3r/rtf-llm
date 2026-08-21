@@ -14,7 +14,6 @@ tests encode current semantics and must be updated when 046 lands.
 import json
 import subprocess
 
-import pytest
 
 from modules.engine.backends.opencode_target import OpencodeTarget
 
@@ -112,19 +111,19 @@ def test_generate_accepts_system_prompt_and_kwargs_advisory_only(monkeypatch):
     assert cmd[-1] == "q"
 
 
-def test_missing_binary_propagates_file_not_found(tmp_path):
+def test_missing_binary_returns_error_marker(tmp_path):
     # Real seam behavior: exec of a nonexistent path fails before any process
     # is created, so no spawn occurs.
     target = OpencodeTarget(workdir=str(tmp_path), opencode_bin="/nonexistent/opencode-binary-xyz")
-    with pytest.raises(FileNotFoundError):
-        target.generate("hello")
+    assert target.generate("hello") == "[ERROR] opencode binary not found"
     assert target._calls == 0
 
 
-def test_timeout_propagates_until_plan_046(monkeypatch, tmp_path):
+def test_timeout_returns_error_marker_plan_046(monkeypatch, tmp_path):
     _patch_run(monkeypatch, exc=subprocess.TimeoutExpired(cmd="opencode", timeout=0.1))
-    with pytest.raises(subprocess.TimeoutExpired):
-        OpencodeTarget(workdir=str(tmp_path)).generate("slow prompt")
+    out = OpencodeTarget(workdir=str(tmp_path)).generate("slow prompt")
+    assert out.startswith("[ERROR]")
+    assert "timed out" in out
 
 
 # --- chat / respond contracts ------------------------------------------------

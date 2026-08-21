@@ -588,6 +588,24 @@ def main():
         session.write_json("recon", "identity.json", model_identity)
         print(f"{Fore.GREEN}[+] Session artifacts: {session}{Style.RESET_ALL}")
 
+    def _write_report() -> str | None:
+        """Write a report from whatever results exist (success path and failure path)."""
+        if not results:
+            return None
+        if session is not None:
+            report_name = os.path.basename(args.output or "report.json")
+            args.output = str(session.dirs["report"] / report_name)
+        llm_stats = llm_client.get_stats() if hasattr(llm_client, "get_stats") else None
+        return report_gen.generate_report(
+            results,
+            output_path=args.output,
+            verbose=args.verbose,
+            llm_stats=llm_stats,
+            model_identity=model_identity,
+            target_system_prompt=getattr(llm_client, "target_system_prompt", None),
+            canary_token=getattr(llm_client, "canary_token", None),
+        )
+
     try:
         if args.dataset and not args.dataset_path:
             parser.error("--dataset requires --dataset-path")
@@ -1033,8 +1051,6 @@ def main():
                 results.append(("comparison", comp_result))
 
         print(f"\n{Fore.CYAN}[*] Generating report...{Style.RESET_ALL}")
-        llm_stats = llm_client.get_stats() if hasattr(llm_client, "get_stats") else None
-
         if engine_pipelines:
             from modules.engine.report import consolidate, to_standard_module
 
@@ -1058,21 +1074,7 @@ def main():
                     f"judge-only finding(s) without ground-truth leaks{Style.RESET_ALL}"
                 )
 
-        if results:
-            if session is not None:
-                report_name = os.path.basename(args.output or "report.json")
-                args.output = str(session.dirs["report"] / report_name)
-            report_path = report_gen.generate_report(
-                results,
-                output_path=args.output,
-                verbose=args.verbose,
-                llm_stats=llm_stats,
-                model_identity=model_identity,
-                target_system_prompt=getattr(llm_client, "target_system_prompt", None),
-                canary_token=getattr(llm_client, "canary_token", None),
-            )
-        else:
-            report_path = None
+        report_path = _write_report()
 
         print(f"\n{Fore.GREEN}[+] Red teaming complete!{Style.RESET_ALL}")
         if report_path:
@@ -1130,6 +1132,15 @@ def main():
             import traceback
 
             traceback.print_exc()
+        try:
+            partial_path = _write_report()
+        except Exception as pe:
+            print(f"{Fore.RED}[!] Partial report generation failed: {pe}{Style.RESET_ALL}")
+        else:
+            if partial_path:
+                print(
+                    f"{Fore.YELLOW}[!] Partial report written: {partial_path}{Style.RESET_ALL}"
+                )
         sys.exit(1)
 
 

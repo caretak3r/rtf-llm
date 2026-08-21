@@ -20,7 +20,13 @@ class Pipeline:
         start = time.monotonic()
 
         for t in self._transforms:
-            result = t.transform(ctx)
+            try:
+                result = t.transform(ctx)
+            except Exception as exc:  # noqa: BLE001 — one transform must not kill the sweep
+                result = TransformResult(
+                    output="",
+                    error=f"[ERROR] {type(t).__name__} raised {type(exc).__name__}: {exc}",
+                )
             results.append(result)
             if early_stop and result.bypassed:
                 break
