@@ -254,9 +254,10 @@ plans executed in 7 waves via parallel agents with disjoint file ownership
 plan (hashes in the table). Notables: 041's untracked-artifact deletions
 landed inside `53af86b` (040's commit) due to index staging order — outcome
 correct, attribution approximate. 050's rerank item and 052's registry item
-were satisfied by earlier waves and skipped to avoid double work. Still
-open for the maintainer: 041 Step 4 (history rewrite / Pages redeploy vs
-accept exposure) and the ADR-001 decision.
+were satisfied by earlier waves and skipped to avoid double work. 041 Step 4
+RESOLVED same day: maintainer accepted the exposure, no history rewrite
+(artifacts stay live on Pages; future runs no longer tracked). Still open:
+the ADR-001 decision.
 
 ## Findings considered and rejected (do not re-audit)
 
