@@ -117,7 +117,7 @@ in an excluded script (044).
 | 38 | [038-adaptive-multi-turn-flows.md](038-adaptive-multi-turn-flows.md) | multi-turn flows are hardcoded, non-adaptive | L | — | TODO |
 | 39 | [039-delete-or-repurpose-orphan-lab-modules.md](039-delete-or-repurpose-orphan-lab-modules.md) | 5 lab modules off-topic/stub, zero KB | S/M | — | TODO |
 | 40 | [040-campaign-report-integrity.md](040-campaign-report-integrity.md) | Campaign shuffle misattributes techniques + last-seed data loss | S | land before 045 | **DONE** `53af86b` |
-| 41 | [041-pages-exposure-triage.md](041-pages-exposure-triage.md) | Public Pages site publishes transcripts w/ operator paths | S/M | maintainer decision in Step 4 | **DONE** `a06632b` (Step 4 history/Pages decision still open for maintainer; untracking rode in `53af86b`) |
+| 41 | [041-pages-exposure-triage.md](041-pages-exposure-triage.md) | Public Pages site publishes transcripts w/ operator paths | S/M | maintainer decision in Step 4 | **DONE** `a06632b` (Step 4 RESOLVED 2026-08-21: exposure accepted, no history rewrite; untracking rode in `53af86b`) |
 | 42 | [042-engine-live-cli-wiring.md](042-engine-live-cli-wiring.md) | `engine.live` unreachable via CLI; T10/T11 provider choices | S | land before 045/046/047 | **DONE** `7676338` |
 | 43 | [043-campaign-canary-ground-truth.md](043-campaign-canary-ground-truth.md) | Canary ground truth structurally dead in campaigns | M | 041 | **DONE** `d0bb4e7` (scratch naming follows 051's scheme; veto flag deferred until needed) |
 | 44 | [044-scoring-spine-llm-judge.md](044-scoring-spine-llm-judge.md) | Judge untested; vote-majority duplicated; veto scope wrong | S/M | before 052 | **DONE** `fcf6e87` |
