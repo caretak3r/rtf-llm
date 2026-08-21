@@ -743,16 +743,20 @@ def main():
 
             db = ProvenanceDB(args.db)
             try:
-                for tid, res in zip(requested, outcome.results):
-                    db.record_finding(
-                        run_id=run_id,
-                        technique=tid,
-                        via_technique=f"seed={seed}",
-                        via_target=args.target or config.get("llm.base_url") or "local",
-                        prompt=(res.output or "")[:400],
-                        status="bypassed" if res.bypassed else ("error" if res.error else "ok"),
-                        score=1.0 if res.bypassed else 0.0,
-                    )
+                findings = 0
+                for s, out in outcomes:
+                    executed_ids = requested[: len(out.results)]
+                    for tid, res in zip(executed_ids, out.results):
+                        db.record_finding(
+                            run_id=run_id,
+                            technique=tid,
+                            via_technique=f"seed={s}",
+                            via_target=args.target or config.get("llm.base_url") or "local",
+                            prompt=(res.output or "")[:400],
+                            status="bypassed" if res.bypassed else ("error" if res.error else "ok"),
+                            score=1.0 if res.bypassed else 0.0,
+                        )
+                        findings += 1
                 metric = max(
                     (sum(1 for r in out.results if r.bypassed) for _, out in outcomes),
                     default=0,
@@ -768,7 +772,7 @@ def main():
                 )
                 print(
                     f"{Fore.GREEN}[+] Provenance written to {args.db} "
-                    f"(run {run_id}, {len(outcome.results)} findings){Style.RESET_ALL}"
+                    f"(run {run_id}, {findings} findings){Style.RESET_ALL}"
                 )
             finally:
                 db.close()
@@ -778,7 +782,8 @@ def main():
                 color = Fore.RED if res.bypassed else (Fore.RED if res.error else Fore.GREEN)
                 print(f"  {color}[{status:8s}]{Style.RESET_ALL} {tid}  metrics={res.metrics}")
 
-            engine_pipelines.append((f"seed:{seed}", requested, outcome))
+            for s, out in outcomes:
+                engine_pipelines.append((f"seed:{s}", requested, out))
 
         if args.module == "prompt-injection" or args.module == "all":
             print(f"\n{Fore.CYAN}[*] Running Prompt Injection Attacks...{Style.RESET_ALL}")

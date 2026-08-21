@@ -24,8 +24,8 @@ def _goals_arg(raw: str) -> list[str]:
 
 
 def _run_goal(
-    transforms: list, ids: list[str], goal: str, config: dict, target, early_stop: bool = True
-) -> object:
+    transforms: list, goal_ids: list[str], goal: str, config: dict, target, early_stop: bool = True
+) -> tuple[object, list[str]]:
     from modules.engine.base import TransformContext
     from modules.engine.pipeline import Pipeline
 
@@ -36,7 +36,8 @@ def _run_goal(
         config=config,
         state={"seed": 1, "campaign": "opencode", "goal": goal},
     )
-    return pipeline.run(ctx, early_stop=early_stop)
+    pipeline_result = pipeline.run(ctx, early_stop=early_stop)
+    return pipeline_result, goal_ids[: len(pipeline_result.results)]
 
 
 def _llm_scored(results: list, ids: list[str], goal: str, target) -> list:
@@ -162,22 +163,22 @@ def main() -> int:
     goals = _goals_arg(args.goals)
     runs = []
     for goal in goals:
-        pipeline_result = _run_goal(
+        pipeline_result, executed = _run_goal(
             per_goal_transforms[goal],
-            ids,
+            per_goal_ids[goal],
             goal,
             config,
             target,
             early_stop=not args.full_sweep,
         )
         if args.judge == "llm":
-            res = _llm_scored(pipeline_result.results, per_goal_ids[goal], goal, target)
+            res = _llm_scored(pipeline_result.results, executed, goal, target)
         else:
             res = list(pipeline_result.results)
         runs.append(
             (
                 goal,
-                ids,
+                executed,
                 type(pipeline_result)(
                     res,
                     pipeline_result.context,
@@ -189,8 +190,7 @@ def main() -> int:
 
     report = consolidate(
         [run[2] for run in runs],
-        scopes=[f"{args.model}" for _ in runs],
-        scope_ids=[ids for _ in runs],
+        scope_ids=[run[1] for run in runs],
     )
 
     from modules.report_generator import ReportGenerator

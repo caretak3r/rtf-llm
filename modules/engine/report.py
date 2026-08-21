@@ -63,7 +63,14 @@ def consolidate(
     for idx, pipeline in enumerate(pipelines):
         ids = scope_ids[idx] if scope_ids else _default_ids(pipeline)
         label = scopes[idx] if scopes else "pipeline"
-        for tid, res in zip(ids, pipeline.results):
+        n = len(pipeline.results)
+        paired = ids[:n]
+        if n > len(ids):
+            raise ValueError(
+                f"scope_ids[{idx}] has {len(ids)} ids but pipeline produced "
+                f"{n} results — id/result pairing would be fabricated"
+            )
+        for tid, res in zip(paired, pipeline.results):
             rows.append(
                 TransformReport(
                     technique=tid or label,

@@ -76,6 +76,13 @@ def test_scope_ids_and_labels():
     assert [t.technique for t in report.transforms] == ["a", "b", "c", "d"]
 
 
+def test_scope_ids_truncate_to_results_prefix():
+    report = consolidate(
+        _pipelines(), scopes=["seed:1", "seed:2"], scope_ids=[["a", "b", "c"], ["d", "surplus"]]
+    )
+    assert [t.technique for t in report.transforms] == ["a", "b", "c", "d"]
+
+
 def test_render_json_roundtrip():
     payload = json.loads(render_json(consolidate(_pipelines())))
     assert payload["total"] == 4
