@@ -111,6 +111,16 @@ def require_authorization():
     print(f"{Fore.GREEN}[+] Authorization acknowledged{Style.RESET_ALL}\n")
 
 
+def build_engine_config(config: dict, live: bool, n_samples: int, diversity_temp: float) -> dict:
+    """Engine-view of the run config: explicit live gate + best_of_n params."""
+    engine_cfg = dict((config or {}).get("engine") or {})
+    engine_cfg["live"] = bool(live)
+    engine_cfg["best_of_n"] = {"n_samples": n_samples, "diversity_temp": diversity_temp}
+    merged = dict(config or {})
+    merged["engine"] = engine_cfg
+    return merged
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Adversarial LLM Red Teaming Framework - Authorized Testing Only",
@@ -148,6 +158,11 @@ def main():
         "--engine",
         action="store_true",
         help="Run the transform Pipeline (engine) instead of the classic dispatcher",
+    )
+    parser.add_argument(
+        "--engine-offline",
+        action="store_true",
+        help="Engine mode without live firing (static prompt construction only)",
     )
     parser.add_argument(
         "--list-transforms", action="store_true", help="List registered engine transforms and exit"
@@ -265,6 +280,10 @@ def main():
             "ollama",
             "lmstudio",
             "any",
+            "zhipu",
+            "glm",
+            "droid",
+            "bedrock",
         ],
         help='LLM provider (use "any" for auto-detect from URL)',
     )
@@ -650,12 +669,12 @@ def main():
                 f" | goal: {args.goal}{Style.RESET_ALL}"
             )
             pipeline = Pipeline(transforms)
-            engine_ctx_config = dict(config)
-            engine_ctx_config.setdefault("engine", {})
-            engine_ctx_config["engine"]["best_of_n"] = {
-                "n_samples": args.n_samples,
-                "diversity_temp": args.diversity_temp,
-            }
+            engine_ctx_config = build_engine_config(
+                config,
+                live=not args.engine_offline,
+                n_samples=args.n_samples,
+                diversity_temp=args.diversity_temp,
+            )
             checkpoint = None
             if args.checkpoint:
                 from modules.engine.backends.checkpoint import CheckpointStore

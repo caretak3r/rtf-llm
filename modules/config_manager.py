@@ -48,6 +48,7 @@ class ConfigManager:
                 "max_tokens": 2000,
                 "timeout": 60,
             },
+            "engine": {"live": False},
             "providers": {
                 "openai": {
                     "api_key": None,
