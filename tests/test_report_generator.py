@@ -92,3 +92,27 @@ def test_module_summary_merged(tmp_path):
     mod = data["modules"]["jailbreak"]
     assert mod["summary"]["total"] == 2
     assert mod["summary"]["success_rate"] == 50.0
+
+
+def test_sensitive_metadata_gated_by_default(tmp_path):
+    gen = make_generator(tmp_path)
+    out = gen.generate_report(
+        make_results(),
+        target_system_prompt="example-system-prompt",
+        canary_token="example-canary-token",
+    )
+    data = json.loads(Path(out).read_text())
+    assert "target_system_prompt" not in data["metadata"]
+    assert "canary_token" not in data["metadata"]
+
+
+def test_sensitive_metadata_published_when_flag_enabled(tmp_path):
+    gen = make_generator(tmp_path, publish_sensitive_metadata=True)
+    out = gen.generate_report(
+        make_results(),
+        target_system_prompt="example-system-prompt",
+        canary_token="example-canary-token",
+    )
+    data = json.loads(Path(out).read_text())
+    assert data["metadata"]["target_system_prompt"] == "example-system-prompt"
+    assert data["metadata"]["canary_token"] == "example-canary-token"

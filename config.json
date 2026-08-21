@@ -147,7 +147,8 @@
     "include_owasp_mapping": true,
     "include_judge_reasoning": true,
     "per_attack_severity": true,
-    "specific_recommendations": true
+    "specific_recommendations": true,
+    "publish_sensitive_metadata": false
   },
   "rate_limiting": {
     "enabled": true,
