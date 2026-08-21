@@ -7,28 +7,57 @@ Handles API keys, model configuration, and environment variables
 import json
 import os
 import getpass
+from pathlib import Path
 from typing import Dict, Any
+
 from colorama import Fore, Style
+
+_PACKAGE_ROOT = Path(__file__).resolve().parent
+
+
+def _default_config_path() -> Path:
+    """Package-anchored default config, valid from any cwd.
+
+    config.json lives at the repo root, one level above modules/, in both the
+    source and editable-install layouts; a wheel install ships no copy yet,
+    so the returned path may not exist and callers fall through to built-in
+    DEFAULT_CONFIG.
+    """
+    candidate = _PACKAGE_ROOT / "config.json"
+    return candidate if candidate.exists() else _PACKAGE_ROOT.parent / "config.json"
 
 
 class ConfigManager:
     """Enhanced configuration manager with secure key handling"""
 
-    def __init__(self, config_path: str = "config.json"):
-        self.config_path = config_path
+    def __init__(self, config_path: str | None = None):
+        # None means auto-resolve: ./config.json first, then the package-
+        # anchored default. An explicit path never falls back to the anchor.
+        self.explicit_path = config_path
+        self.config_path = config_path or "config.json"
+        self.resolved_source: Path | None = None
         self.config = self._load_config()
         self._load_environment_variables()
         self._validate_config()
 
     def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from file"""
+        """Load configuration from file.
+
+        Resolution order: explicit path > ./config.json (cwd, unchanged user
+        behavior) > package-anchored config.json > built-in defaults.
+        """
         try:
-            if os.path.exists(self.config_path):
-                with open(self.config_path, "r") as f:
-                    config = json.load(f)
-                return config
-            else:
-                return self._get_default_config()
+            candidates = (
+                [Path(self.explicit_path)]
+                if self.explicit_path is not None
+                else [Path.cwd() / "config.json", _default_config_path()]
+            )
+            for candidate in candidates:
+                if candidate.is_file():
+                    self.resolved_source = candidate.resolve()
+                    with open(candidate, "r") as f:
+                        return json.load(f)
+            return self._get_default_config()
         except json.JSONDecodeError as e:
             print(f"{Fore.RED}[!] Error parsing config.json: {e}{Style.RESET_ALL}")
             return self._get_default_config()
