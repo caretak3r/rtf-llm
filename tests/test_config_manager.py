@@ -1,4 +1,9 @@
+#!/usr/bin/env python3
+"""Baseline tests for ConfigManager."""
+
 import json
+
+
 from modules.config_manager import ConfigManager
 
 

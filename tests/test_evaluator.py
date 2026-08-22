@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Baseline tests for AttackEvaluator core paths."""
+
 from modules.evaluator import AttackEvaluator
 
 

@@ -344,6 +344,8 @@ Generated reports include:
 
 When this repo is pushed to GitHub, the markdown docs in `docs/` and every HTML report under `docs/reports/` are automatically published to GitHub Pages on each push to `main`.
 
+Only committed `docs/*.md` pages are published; run reports and campaign outputs stay local (gitignored). Enable `reporting.publish_sensitive_metadata` only if you intentionally want system prompts/canaries in public reports.
+
 - Landing index (docs + all historical reports, newest first): `https://<user>.github.io/<repo>/`
 - Per-module docs: `https://<user>.github.io/<repo>/docs/<module>.html`
 - Most recent run shortcut: `https://<user>.github.io/<repo>/latest.html`
@@ -375,9 +377,21 @@ uv run python main.py --help
 uv lock
 ```
 
-## Running tests
+
+## Development
+
+Set up the dev environment:
 
 ```bash
 uv sync --group dev
-uv run pytest -q
 ```
+
+Run quality checks locally:
+
+```bash
+uv run ruff check .        # lint
+uv run ruff format --check .   # format check (use `uv run ruff format .` to apply)
+uv run mypy modules/ main.py   # type check
+```
+
+These same checks run automatically on every PR via `.github/workflows/quality.yml`.

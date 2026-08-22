@@ -250,3 +250,13 @@ nohup.out
 
 # GitHub Pages local build output
 _site/
+
+# Run artifacts — local only, never published
+docs/reports/
+opencode_campaign/
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
