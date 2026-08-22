@@ -30,9 +30,7 @@ class RefusalPattern:
 
     @classmethod
     def from_keywords(cls, keywords: list[str]) -> list[RefusalPattern]:
-        return [
-            cls(re.compile(re.escape(k), re.IGNORECASE), literal=k) for k in keywords
-        ]
+        return [cls(re.compile(re.escape(k), re.IGNORECASE), literal=k) for k in keywords]
 
 
 DEFAULT_REFUSAL_KEYWORDS = [

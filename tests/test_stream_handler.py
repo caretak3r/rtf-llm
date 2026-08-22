@@ -71,8 +71,16 @@ def test_swallow_flushes_pending_when_scan_clears():
     # "cannot " is a prefix of a refusal literal -> withheld; the next token
     # clears the scan ("cannot do" completes no phrase), so the held token is
     # flushed before it.
-    pats = [RefusalPattern(re.compile(re.escape("cannot comply"), re.IGNORECASE), min_window=1, literal="cannot comply")]
-    out, stream, refusal = _collect(["I ", "cannot ", " do that"], RefusalStrategy.SWALLOW, patterns=pats)
+    pats = [
+        RefusalPattern(
+            re.compile(re.escape("cannot comply"), re.IGNORECASE),
+            min_window=1,
+            literal="cannot comply",
+        )
+    ]
+    out, stream, refusal = _collect(
+        ["I ", "cannot ", " do that"], RefusalStrategy.SWALLOW, patterns=pats
+    )
     assert out == ["I ", "cannot ", " do that"]
     assert stream.stats.tokens_emitted == 3
     assert not stream.aborted
@@ -81,7 +89,9 @@ def test_swallow_flushes_pending_when_scan_clears():
 
 def test_swallow_withholds_forming_phrase_and_drops_it_on_refusal():
     phrase = "I cannot help with that"
-    pats = [RefusalPattern(re.compile(re.escape(phrase), re.IGNORECASE), min_window=1, literal=phrase)]
+    pats = [
+        RefusalPattern(re.compile(re.escape(phrase), re.IGNORECASE), min_window=1, literal=phrase)
+    ]
     out, stream, refusal = _collect(
         ["sure ", "I cannot", " help with", " that"],
         RefusalStrategy.SWALLOW,
@@ -138,7 +148,9 @@ def test_retroactive_raises_refusal_detected_with_partial():
 
 
 def test_min_window_blocks_detection_on_short_buffer():
-    out, stream, refusal = _collect([HIT], RefusalStrategy.COMMIT, patterns=_pattern(min_window=100))
+    out, stream, refusal = _collect(
+        [HIT], RefusalStrategy.COMMIT, patterns=_pattern(min_window=100)
+    )
     assert out == [HIT]
     assert not stream.aborted
     assert stream.stats.stop_reason is StopReason.COMPLETED

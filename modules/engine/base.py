@@ -40,4 +40,3 @@ class Transform(ABC):
 
     @abstractmethod
     def transform(self, ctx: TransformContext) -> TransformResult: ...
-

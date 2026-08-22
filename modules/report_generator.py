@@ -164,9 +164,7 @@ class ReportGenerator:
         if model_identity:
             report_data["metadata"]["model_identity"] = model_identity
 
-        publish_meta = bool(
-            (self.config or {}).get("publish_sensitive_metadata", False)
-        )
+        publish_meta = bool((self.config or {}).get("publish_sensitive_metadata", False))
         if target_system_prompt and publish_meta:
             report_data["metadata"]["target_system_prompt"] = target_system_prompt
         if canary_token and publish_meta:

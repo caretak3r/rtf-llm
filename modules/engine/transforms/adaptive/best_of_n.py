@@ -22,10 +22,7 @@ def _refusal_detected(ctx: TransformContext, response: str) -> bool:
     """Plan 050 minimal wiring, mirroring adaptive/pair's detector fallback
     chain: LLM goal judge when configured (engine.judge == "llm"), keyword
     fallback otherwise."""
-    if (
-        (ctx.config or {}).get("engine", {}).get("judge") == "llm"
-        and ctx.target is not None
-    ):
+    if (ctx.config or {}).get("engine", {}).get("judge") == "llm" and ctx.target is not None:
         from modules.engine.eval.llm_judge import LLMGoalJudge
 
         return LLMGoalJudge(ctx.target, goal=ctx.input or "").classify(response)[0]

@@ -60,9 +60,7 @@ def _install_fake_module(monkeypatch, campaign=None, exc=None):
             return campaign
 
     fake_mod = types.SimpleNamespace(PromptInjectionModule=_FakeLegacyModule)
-    monkeypatch.setattr(
-        lb, "importlib", types.SimpleNamespace(import_module=lambda name: fake_mod)
-    )
+    monkeypatch.setattr(lb, "importlib", types.SimpleNamespace(import_module=lambda name: fake_mod))
     return calls
 
 
@@ -77,9 +75,7 @@ def test_live_gate_off_without_target():
 
 
 def test_live_gate_off_when_engine_live_false():
-    result = _bridge().transform(
-        _ctx(target=_FakeTarget(), config={"engine": {"live": False}})
-    )
+    result = _bridge().transform(_ctx(target=_FakeTarget(), config={"engine": {"live": False}}))
     assert "requires a live target" in result.error
     assert result.bypassed is False
 

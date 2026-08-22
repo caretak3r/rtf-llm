@@ -74,5 +74,3 @@ def test_stall_detector_no_stall_with_beats():
     detector = StallDetector(5.0)
     detector.beat()
     assert detector.check() is None
-
-
