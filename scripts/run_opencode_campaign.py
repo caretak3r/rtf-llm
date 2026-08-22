@@ -80,11 +80,17 @@ def resolve_workdir(workdir_arg: str | None, out_dir: str, allow_home: bool = Fa
         workdir.mkdir(parents=True, exist_ok=True)
     else:
         workdir = Path(workdir_arg).expanduser()
-    if workdir.resolve() == Path.home().resolve() and not allow_home:
-        raise SystemExit(
-            "error: --workdir points at your HOME directory; "
-            "pass --allow-home-workdir to accept the risk"
-        )
+        # Explicit args get the full fence: anything RESOLVING under $HOME
+        # (subdirs and symlinks included) hands a compromised target agent a
+        # cwd with traversal reach into every operator file. Scratch defaults
+        # are exempt — the operator already chose --out deliberately.
+        resolved = workdir.resolve()
+        home = Path.home().resolve()
+        if not allow_home and (resolved == home or home in resolved.parents):
+            raise SystemExit(
+                "error: --workdir resolves inside your HOME directory; "
+                "pass --allow-home-workdir to accept the risk"
+            )
     return str(workdir)
 
 

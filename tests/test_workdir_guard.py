@@ -70,3 +70,40 @@ def test_droid_unsafe_flag_optin_still_runs(monkeypatch):
     client = LLMClient({"provider": "droid"})
     assert client._droid_generate("hello") == "ok\n"
     assert "--skip-permissions-unsafe" in seen["cmd"]
+
+
+def test_explicit_subdir_of_home_requires_optin(monkeypatch, tmp_path):
+    """POC regression: ~/Documents as workdir gave a compromised agent
+    traversal reach into every operator file via ../.."""
+    from scripts.run_opencode_campaign import resolve_workdir
+
+    fakehome = tmp_path / "fakehome"
+    (fakehome / "Documents").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(fakehome))
+    with pytest.raises(SystemExit):
+        resolve_workdir(str(fakehome / "Documents"), out_dir=str(tmp_path / "x"))
+    out = resolve_workdir(str(fakehome / "Documents"), out_dir=str(tmp_path / "x"), allow_home=True)
+    assert Path(out).resolve() == (fakehome / "Documents").resolve()
+
+
+def test_explicit_symlink_into_home_requires_optin(monkeypatch, tmp_path):
+    from scripts.run_opencode_campaign import resolve_workdir
+
+    fakehome = tmp_path / "fakehome"
+    fakehome.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(fakehome)
+    monkeypatch.setenv("HOME", str(fakehome))
+    with pytest.raises(SystemExit):
+        resolve_workdir(str(link), out_dir=str(tmp_path / "x"))
+
+
+def test_scratch_under_home_still_allowed(monkeypatch, tmp_path):
+    """--out under home stays usable: only EXPLICIT workdir args are fenced."""
+    from scripts.run_opencode_campaign import resolve_workdir
+
+    fakehome = tmp_path / "fakehome"
+    fakehome.mkdir()
+    monkeypatch.setenv("HOME", str(fakehome))
+    out = resolve_workdir(None, out_dir=str(fakehome / "campout"))
+    assert Path(out).is_dir()
